@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tells Gate</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--ink:#e8eaf0;--dim:#8b93a7;--pass:#2fbf71;--warn:#f0b429;--fail:#ef4444;--hl:rgba(239,68,68,.28)}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid #232734}
+header h1{font-size:18px;margin:0}header .tag{color:var(--dim);font-size:13px}
+main{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;padding:18px 22px}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid #232734;border-radius:12px;padding:14px}
+.editor{position:relative;min-height:340px;font:16px/1.6 ui-sans-serif,system-ui,sans-serif}
+.editor textarea,.editor .mirror{position:absolute;inset:0;padding:12px;margin:0;border:0;white-space:pre-wrap;word-wrap:break-word;font:inherit;overflow:auto}
+.editor textarea{background:transparent;color:var(--ink);resize:none;outline:none;caret-color:#fff;z-index:2}
+.editor .mirror{color:transparent;z-index:1}
+.mirror mark{background:var(--hl);color:transparent;border-bottom:2px solid var(--fail);border-radius:3px}
+.mirror mark.sel{background:rgba(240,180,41,.45)}
+.score{display:flex;align-items:baseline;gap:10px}.score .n{font-size:52px;font-weight:800;line-height:1}
+.verdict{font-weight:700;padding:2px 10px;border-radius:999px;font-size:13px;text-transform:uppercase}
+.pass{color:var(--pass)}.warn{color:var(--warn)}.fail{color:var(--fail)}
+.verdict.pass{background:rgba(47,191,113,.15)}.verdict.warn{background:rgba(240,180,41,.15)}.verdict.fail{background:rgba(239,68,68,.15)}
+.bar{height:8px;background:#232734;border-radius:9px;margin:10px 0 14px;overflow:hidden}.bar i{display:block;height:100%;transition:width .3s}
+ul.hits{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto}
+ul.hits li{padding:8px 10px;border-radius:8px;margin-bottom:6px;background:#1d212b;cursor:pointer}
+ul.hits li:hover{background:#252a36}
+.rid{font:12px ui-monospace,monospace;color:var(--warn)}.frag{font-weight:600}.fix{color:var(--dim);font-size:13px}
+button{background:#1d9bf0;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer}
+button.ghost{background:#232734}
+.row{display:flex;gap:8px;margin-top:10px}.meta{color:var(--dim);font-size:13px}
+.empty{color:var(--pass);padding:10px}
+</style></head><body>
+<header><h1>Tells Gate</h1><span class="tag">scores a draft for AI-writing tells from banned.md</span></header>
+<main>
+<section class="panel">
+  <div class="editor"><div class="mirror" id="mirror"></div><textarea id="draft" spellcheck="false" placeholder="Paste a draft…"></textarea></div>
+  <div class="row"><button id="apply">Apply suggested rewrite</button><button class="ghost" id="sample">Load sloppy sample</button><span class="meta" id="meta"></span></div>
+</section>
+<section class="panel">
+  <div class="score"><span class="n" id="score">–</span><span class="verdict" id="verdict"></span></div>
+  <div class="bar"><i id="bar"></i></div>
+  <ul class="hits" id="hits"></ul>
+</section>
+</main>
+<script>
+const $=id=>document.getElementById(id);const ta=$('draft'),mirror=$('mirror');
+const SAMPLE=`🚨 BREAKING: Grok quietly shipped the best feature of the year 👇
+
+Most people use AI wrong. It's not a chatbot, it's a coworker. Write. Edit. Ship.
+
+It can now research like a $150/hour analyst. A powerful, seamless, game-changing workflow that will revolutionize how you leverage your notes.
+
+The result? Pure magic. Set this up before Monday. That's the whole game.
+
+At the end of the day, the future is bright. Thoughts?`;
+let last=null,timer=null;
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function paint(text,hits,sel){const cp=Array.from(text);const sl=(a,b)=>cp.slice(a,b).join('');let out='',i=0;const spans=[];for(const h of hits){if(h.start<i)continue;spans.push(h);i=h.end}
+ i=0;spans.forEach((h,k)=>{out+=esc(sl(i,h.start))+`<mark class="${h===sel?'sel':''}">${esc(sl(h.start,h.end))}</mark>`;i=h.end});
+ mirror.innerHTML=out+esc(sl(i))+'\n';}
+function render(r){last=r;const text=ta.value;$('score').textContent=r.score;$('score').className='n '+r.verdict;
+ $('verdict').textContent=r.verdict;$('verdict').className='verdict '+r.verdict;
+ const b=$('bar');b.style.width=r.score+'%';b.style.background=`var(--${r.verdict})`;
+ $('meta').textContent=`${r.words} words · ${r.hits.length} tells`;
+ const ul=$('hits');ul.innerHTML=r.hits.length?'':'<li class="empty">No tells found. Ship it.</li>';
+ r.hits.forEach(h=>{const li=document.createElement('li');li.innerHTML=`<div><span class="rid">${h.rule} ${h.name}</span> · <span class="frag">“${esc(h.text.trim().slice(0,60))}”</span></div><div class="fix">${esc(h.fix)} → <b>${esc(h.suggestion)}</b></div>`;
+  li.onmouseenter=()=>paint(text,r.hits,h);li.onmouseleave=()=>paint(text,r.hits);ul.appendChild(li)});
+ paint(text,r.hits);}
+async function run(){const text=ta.value;const res=await fetch('/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});render(await res.json());}
+ta.addEventListener('input',()=>{paint(ta.value,[]);clearTimeout(timer);timer=setTimeout(run,150)});
+ta.addEventListener('scroll',()=>{mirror.scrollTop=ta.scrollTop});
+$('apply').onclick=()=>{if(last&&last.rewrite){ta.value=last.rewrite;run()}};
+$('sample').onclick=()=>{ta.value=SAMPLE;run()};
+const q=new URLSearchParams(location.search);ta.value=q.get('text')||SAMPLE;run();
+</script></body></html>

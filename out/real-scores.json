@@ -1,0 +1,1080 @@
+[
+ {
+  "file": "xq-0.txt",
+  "score": 100,
+  "verdict": "pass",
+  "words": 20,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "xq-1.txt",
+  "score": 100,
+  "verdict": "pass",
+  "words": 16,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "aa-resident-desk.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 167,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "aacpl-shelf.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 154,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "agent-playbook.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 712,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "agent-wire.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 163,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "api-dugout.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 291,
+  "hits": 6,
+  "by_rule": {
+   "TG015": 6
+  }
+ },
+ {
+  "file": "aspire-board.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 320,
+  "hits": 2,
+  "by_rule": {
+   "TG011": 1,
+   "TG015": 1
+  }
+ },
+ {
+  "file": "backyard-sky.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 1005,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "bat-flap.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 296,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "beat-garden.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 175,
+  "hits": 5,
+  "by_rule": {
+   "TG015": 5
+  }
+ },
+ {
+  "file": "bookmark-atlas.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 878,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bot-island-3d.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1086,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bot-island-arcade.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 956,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bot-island-timelapse.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1099,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bot-island.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 2436,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bot-launcher.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 297,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "boyd-wall.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1685,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "bridge-penalties.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 253,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "camden-nights.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 256,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "carpool-coord.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 185,
+  "hits": 4,
+  "by_rule": {
+   "TG015": 4
+  }
+ },
+ {
+  "file": "chelsea-climb.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 233,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "chelsea-matchday.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 380,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "chelsea-tactics.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 226,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "chelsea-time-machine.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 574,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "chelsea-tracker.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1041,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "chesapeake-tides.md",
+  "score": 88,
+  "verdict": "pass",
+  "words": 161,
+  "hits": 3,
+  "by_rule": {
+   "TG015": 3
+  }
+ },
+ {
+  "file": "chopsticks.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1257,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "chore-reward-chart.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 149,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "confirmation-trail.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 173,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "design-motion-studio.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 256,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "double-booking-radar.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 153,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "draft-day-notes.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 180,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "draft-day.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 19,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "dungeon-night.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 336,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "escape-room.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 350,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "explainer-studio.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1171,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "fall-garden-7b.md",
+  "score": 88,
+  "verdict": "pass",
+  "words": 154,
+  "hits": 3,
+  "by_rule": {
+   "TG015": 3
+  }
+ },
+ {
+  "file": "family-meal-planner.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 153,
+  "hits": 4,
+  "by_rule": {
+   "TG015": 4
+  }
+ },
+ {
+  "file": "family-sports-photo-desk.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 376,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "family-story-vault.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 158,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "family-week.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 976,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "first-run-lab.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 303,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "fleet-doctor.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 401,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "fleet-funnies.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1176,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "fleet-yearbook.md",
+  "score": 97,
+  "verdict": "pass",
+  "words": 527,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "four-game-jam.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 315,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "fridge-board.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 962,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "gift-board.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 138,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "grok-council.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 183,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "habit-streaks.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 149,
+  "hits": 4,
+  "by_rule": {
+   "TG015": 4
+  }
+ },
+ {
+  "file": "halloween-night.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 158,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "hannahs-drive.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1031,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "home-vault.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 147,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "hornets-anthem.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 387,
+  "hits": 1,
+  "by_rule": {
+   "TG010": 1
+  }
+ },
+ {
+  "file": "hornets-tactics.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 479,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "hspt-quest.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1036,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "hub.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 567,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "idea-foundry.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 15,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "interest-journal-epub.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 141,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "interest-press.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 152,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "keyboard-kickoff.md",
+  "score": 98,
+  "verdict": "pass",
+  "words": 359,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "kids-coding-studio.md",
+  "score": 93,
+  "verdict": "pass",
+  "words": 243,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "list-brief-pack.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 261,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "llm-box-advisor.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1100,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "mars-colony.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1494,
+  "hits": 1,
+  "by_rule": {
+   "TG010": 1
+  }
+ },
+ {
+  "file": "math-arcade.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1063,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "md-daytrips.md",
+  "score": 88,
+  "verdict": "pass",
+  "words": 139,
+  "hits": 3,
+  "by_rule": {
+   "TG015": 3
+  }
+ },
+ {
+  "file": "millersville-storm-prep.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 163,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "mission-control.md",
+  "score": 93,
+  "verdict": "pass",
+  "words": 570,
+  "hits": 4,
+  "by_rule": {
+   "TG011": 1,
+   "TG015": 3
+  }
+ },
+ {
+  "file": "model-bench.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 630,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "museum.md",
+  "score": 97,
+  "verdict": "pass",
+  "words": 520,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "nws-annapolis.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 195,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "orioles-2026.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 310,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "orioles-hot-stove.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 358,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "orioles-trade.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 50,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "patch-patrol.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 680,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "peer-review-arena.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 329,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "pixel-pet.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 168,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "pods-radio.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 707,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "powerwall-solar.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 185,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "prompt-polisher.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 476,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "pumpkin-carver.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 308,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "ravens-film-room.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 1435,
+  "hits": 7,
+  "by_rule": {
+   "TG015": 7
+  }
+ },
+ {
+  "file": "ravens-gameday.md",
+  "score": 94,
+  "verdict": "pass",
+  "words": 263,
+  "hits": 1,
+  "by_rule": {
+   "TG011": 1
+  }
+ },
+ {
+  "file": "ravens-opponent.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 256,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "ravens-playbook.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 263,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "ravens-sim.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 504,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "ravens-week-brief.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 414,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "recall-watch.md",
+  "score": 88,
+  "verdict": "pass",
+  "words": 201,
+  "hits": 3,
+  "by_rule": {
+   "TG015": 3
+  }
+ },
+ {
+  "file": "reset-day-arcade.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 242,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "review-desk.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 1067,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "routine-radar.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 145,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "run-replay.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 175,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "salon-back-office.md",
+  "score": 92,
+  "verdict": "pass",
+  "words": 176,
+  "hits": 2,
+  "by_rule": {
+   "TG015": 2
+  }
+ },
+ {
+  "file": "school-pulse.md",
+  "score": 99,
+  "verdict": "pass",
+  "words": 944,
+  "hits": 1,
+  "by_rule": {
+   "TG014": 1
+  }
+ },
+ {
+  "file": "season-book.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 872,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "ship-it-stats.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 587,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "skill-forge.md",
+  "score": 96,
+  "verdict": "pass",
+  "words": 157,
+  "hits": 1,
+  "by_rule": {
+   "TG015": 1
+  }
+ },
+ {
+  "file": "sports-desk.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 484,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "sports-gear-checkout.md",
+  "score": 88,
+  "verdict": "pass",
+  "words": 103,
+  "hits": 3,
+  "by_rule": {
+   "TG015": 3
+  }
+ },
+ {
+  "file": "starlink-globe.md",
+  "score": 91,
+  "verdict": "pass",
+  "words": 273,
+  "hits": 2,
+  "by_rule": {
+   "TG011": 1,
+   "TG015": 1
+  }
+ },
+ {
+  "file": "starship-catch.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 186,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "starship-mission-control.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 10294,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "starship-tower.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 232,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "statechart-lab.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 22,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "terps-football.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 321,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "terps-hoops.md",
+  "score": 89,
+  "verdict": "pass",
+  "words": 359,
+  "hits": 4,
+  "by_rule": {
+   "TG011": 1,
+   "TG015": 3
+  }
+ },
+ {
+  "file": "terps-preview.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 570,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "terps-recruit.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 50,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "times-archive.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 754,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "token-burn.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 183,
+  "hits": 5,
+  "by_rule": {
+   "TG015": 5
+  }
+ },
+ {
+  "file": "token-pace.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 202,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "trailer.md",
+  "score": 99,
+  "verdict": "pass",
+  "words": 990,
+  "hits": 1,
+  "by_rule": {
+   "TG002": 1
+  }
+ },
+ {
+  "file": "train-bot-arcade.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 827,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "trivia-night.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 625,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "veo-highlight-editor.md",
+  "score": 91,
+  "verdict": "pass",
+  "words": 870,
+  "hits": 10,
+  "by_rule": {
+   "TG015": 10
+  }
+ },
+ {
+  "file": "vocab-voyage.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 159,
+  "hits": 4,
+  "by_rule": {
+   "TG015": 4
+  }
+ },
+ {
+  "file": "weekend-gameplan.md",
+  "score": 84,
+  "verdict": "pass",
+  "words": 168,
+  "hits": 4,
+  "by_rule": {
+   "TG015": 4
+  }
+ },
+ {
+  "file": "writing-studio.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 992,
+  "hits": 0,
+  "by_rule": {}
+ },
+ {
+  "file": "x-post-queue.md",
+  "score": 100,
+  "verdict": "pass",
+  "words": 210,
+  "hits": 0,
+  "by_rule": {}
+ }
+]
