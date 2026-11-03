@@ -20,7 +20,7 @@ A shared `banned.md` of AI-writing tells plus a checker that scores any draft 0â
 5. LLM pass: behind `--llm` / `{"llm": true}`. It's a stub offline and calls `TELLS_GATE_LLM_URL` when that's set.
 6. Integration: an INTEGRATION.md patch for X Post Queue approve. It fails open and supports `force`.
 
-Out of scope: auto-posting, any account access, anything KPD, and style rules about Boyd's personal voice (that's a v2 "your own tells" step).
+Out of scope: auto-posting, any account access, and style rules about Boyd's personal voice (that's a v2 "your own tells" step).
 
 ## Core types
 - `Rule {id, name, why, fix, weight, cap, patterns[], detector?, example}`
