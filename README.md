@@ -4,7 +4,9 @@ Scores a draft 0–100 for AI-writing tells, flags each one with its span, and s
 The rules live in one file, [`banned.md`](banned.md): 17 rules, each with an id, why it reads as AI,
 a fix, a rewriter, and a regex or a built-in detector. Edit the file to change the gate.
 
-![demo](demo.gif)
+The demo is synthetic text. The raw file is https://github.com/BoydVC/tells-gate/raw/cursor/v1-polish-4784/screenshots/demo.gif
+
+![demo](https://github.com/BoydVC/tells-gate/raw/cursor/v1-polish-4784/screenshots/demo.gif)
 
 ## Use it in 2 minutes
 
