@@ -1,0 +1,3 @@
+.PHONY: check
+check:
+	PYTHONPATH=. python3 -m unittest discover -s tests

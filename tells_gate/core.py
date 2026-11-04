@@ -5,11 +5,13 @@ import os
 import re
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Literal, NamedTuple
 
 DEFAULT_BANNED = Path(os.environ.get("TELLS_GATE_BANNED", Path(__file__).resolve().parent.parent / "banned.md"))
 PASS_AT = 80
 WARN_AT = 60
+
+Span = tuple[int, int]
 
 
 @dataclass(frozen=True)
@@ -23,6 +25,11 @@ class Rule:
     patterns: tuple[re.Pattern, ...] = ()
     detector: str | None = None
     example: str = ""
+    rewriter: str = "none"
+
+    @property
+    def rewriter_note(self) -> str:
+        return REWRITERS[self.rewriter].note
 
 
 @dataclass
@@ -57,7 +64,7 @@ class Report:
 
 # ---------------------------------------------------------------- parsing
 _RULE_HEAD = re.compile(r"^##\s+(TG\d{3})\s+(\S+)\s*$")
-_FIELD = re.compile(r"^-\s+(why|fix|weight|cap|pattern|detector|example|case):\s?(.*)$")
+_FIELD = re.compile(r"^-\s+(why|fix|weight|cap|pattern|detector|example|case|rewriter):\s?(.*)$")
 
 
 def parse_banned(md: str) -> list[Rule]:
@@ -73,9 +80,12 @@ def parse_banned(md: str) -> list[Rule]:
             raise ValueError(f"{cur['id']}: needs pattern: or detector:")
         if cur.get("detector") and cur["detector"] not in DETECTORS:
             raise ValueError(f"{cur['id']}: unknown detector {cur['detector']}")
+        rewriter = cur.get("rewriter", "none")
+        if rewriter not in REWRITERS:
+            raise ValueError(f"{cur['id']}: unknown rewriter {rewriter}")
         rules.append(Rule(cur["id"], cur["name"], cur.get("why", ""), cur.get("fix", ""),
                           float(cur.get("weight", 5)), float(cur.get("cap", 15)), pats,
-                          cur.get("detector"), cur.get("example", "")))
+                          cur.get("detector"), cur.get("example", ""), rewriter))
 
     for raw in md.splitlines():
         m = _RULE_HEAD.match(raw.strip())
@@ -111,21 +121,22 @@ _URL = re.compile(r"https?://\S+")
 _HTML = re.compile(r"<[^>\n]+>")
 
 
-def mask(text: str) -> str:
-    """Blank out code, URLs and HTML with spaces so offsets stay valid."""
+def _fold_apostrophes(text: str) -> str:
+    return text.replace("\u2019", "'").replace("\u2018", "'")
+
+
+def mask(text: str, fill: str = " ") -> str:
     def blank(m):
-        return re.sub(r"[^\n]", " ", m.group(0))
+        return re.sub(r"[^\n]", fill, m.group(0))
     out = _CODE_FENCE.sub(blank, text)
     out = _INLINE.sub(blank, out)
     out = _HTML.sub(blank, out)
     # keep URLs visible to the arrow rule: mask only the URL body after the scheme
-    out = _URL.sub(lambda m: m.group(0)[:8] + " " * (len(m.group(0)) - 8), out)
+    out = _URL.sub(lambda m: m.group(0)[:8] + fill * (len(m.group(0)) - 8), out)
     return out
 
 
 # ---------------------------------------------------------------- detectors
-Span = tuple[int, int]
-_SENT_END = re.compile(r"(?<=[.!?])\s+|\n+")
 HYPE_ADJ = {
     "powerful", "seamless", "game-changing", "revolutionary", "cutting-edge", "innovative",
     "robust", "transformative", "groundbreaking", "next-level", "effortless", "intuitive",
@@ -137,15 +148,45 @@ ABSTRACT = {
     "power", "flexibility", "scale", "impact", "innovation", "productivity", "creativity",
     "connection", "freedom", "control", "insight", "insights", "value", "quality", "purpose",
     "passion", "community", "collaboration", "transparency", "accountability", "momentum",
-    "fast", "simple", "reliable", "secure", "smart", "faster", "smarter", "better", "cheaper",
-    "easier", "stronger", "safer", "clean", "clear", "bold",
 }
+ABBREVIATIONS = {"dr", "mr", "mrs", "ms", "st", "fig", "eq", "no", "vs", "jr", "sr"}
+_BEAT_RUN = re.compile(r"(?:(?<=^)|(?<=[\s>]))(?:[A-Z][\w'’-]*(?: [\w'’-]+)?[.!](?: |(?=\s|$)))+", re.M)
+_BEAT = re.compile(r"[A-Z][\w'’-]*(?: [\w'’-]+)?[.!]")
+
+
+def _between_digits(t: str, s: int, e: int) -> bool:
+    return bool(re.search(r"\d[ \t]*\Z", t[max(0, s - 8):s]) and re.match(r"[ \t]*\d", t[e:e + 8]))
+
+
+def _breaks_the_run(words: list[str]) -> bool:
+    if len(words) == 1 and words[0].lower() in ABBREVIATIONS:
+        return True
+    return any(len(re.sub(r"[^A-Za-z]", "", w)) < 3 for w in words)
+
+
+def _cannot_open_a_run(streak: list[Span], after_abbrev: bool) -> bool:
+    return not streak and after_abbrev
 
 
 def det_triad_fragments(t: str) -> list[Span]:
     # three or more consecutive 1-2 word sentences: "Write. Edit. Ship."
-    pat = re.compile(r"(?:(?<=^)|(?<=[\s>]))((?:[A-Z][\w'’-]*(?: [\w'’-]+)?[.!] ){2,}[A-Z][\w'’-]*(?: [\w'’-]+)?[.!])(?=\s|$)", re.M)
-    return [m.span(1) for m in pat.finditer(t)]
+    out: list[Span] = []
+    for run in _BEAT_RUN.finditer(t):
+        streak: list[Span] = []
+        after_abbrev = False
+        for b in _BEAT.finditer(t, run.start(), run.end()):
+            words = b.group()[:-1].split()
+            abbrev = len(words) == 1 and words[0].lower() in ABBREVIATIONS
+            if _breaks_the_run(words) or _cannot_open_a_run(streak, after_abbrev):
+                if len(streak) >= 3:
+                    out.append((streak[0][0], streak[-1][1]))
+                streak = []
+            else:
+                streak.append(b.span())
+            after_abbrev = abbrev
+        if len(streak) >= 3:
+            out.append((streak[0][0], streak[-1][1]))
+    return out
 
 
 def det_triad_list(t: str) -> list[Span]:
@@ -168,12 +209,15 @@ def det_adjective_pile(t: str) -> list[Span]:
     return out
 
 
+_LIST_LABEL_DASH = re.compile(
+    r"(?m)^\s*(?:[-*+]|\d+\.)\s+(?:\*\*[^*\n]{1,60}\*\*|`[^`\n]{1,60}`|\S[^—–\n]{0,40}?)\s*[—–]"
+)
+
+
 def det_em_dash_density(t: str) -> list[Span]:
-    # exempt numeric ranges (3–1, 8–10) and list labels ("- **Kickoff** — ...", "1. Kickoff — ...")
-    label = re.compile(r"(?m)^\s*(?:[-*+]|\d+\.)\s+(?:\*\*[^*\n]{1,60}\*\*|`[^`\n]{1,60}`|\S[^—–\n]{0,40}?)\s*[—–]")
-    exempt = {m.end() - 1 for m in label.finditer(t)}
+    exempt = {m.end() - 1 for m in _LIST_LABEL_DASH.finditer(t)}
     dashes = [m.span() for m in re.finditer(r"—|–|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)", t)
-              if m.start() not in exempt and not re.match(r"\d[–—]\d", t[max(0, m.start() - 1):m.end() + 1])]
+              if m.start() not in exempt and not _between_digits(t, *m.span())]
     words = max(1, len(re.findall(r"\b\w+\b", t)))
     allowed = max(1, int(words / 100))  # one dash per 100 words is fine
     return dashes[allowed:] if len(dashes) > allowed else []
@@ -187,29 +231,128 @@ DETECTORS: dict[str, Callable[[str], list[Span]]] = {
 }
 
 
-# ---------------------------------------------------------------- suggestions
-def suggest(rule: Rule, frag: str) -> str:
-    f = frag.strip()
-    rid = rule.id
-    if rid == "TG001":
-        return _fix_not_x(f)
-    if rid in ("TG002", "TG006", "TG013", "TG014", "TG017", "TG012"):
-        return "(delete)"
-    if rid == "TG007":
-        return f.split(".")[0] + "."
-    if rid in ("TG008", "TG009"):
-        parts = [p for p in re.split(r",\s*(?:and\s+)?|\s+and\s+|\s*&\s*", f) if p]
-        return parts[-1] if rid == "TG009" else parts[0]
-    if rid == "TG010":
-        return PLAIN.get(f.lower(), "(plain word)")
-    if rid == "TG011":
-        return "(delete)"
-    if rid == "TG015":
-        return ","
-    if rid == "TG016":
-        return "(state it directly)"
-    return rule.fix
+@dataclass(frozen=True)
+class Found:
+    rule: Rule
+    start: int
+    end: int
+    keep: Span | None = None
 
+
+def _detect(text: str, rules: Iterable[Rule]) -> list[Found]:
+    view = _fold_apostrophes(mask(text))
+    found: list[Found] = []
+    for r in rules:
+        cands: list[tuple[int, int, Span | None]] = []
+        if r.detector:
+            cands += [(s, e, None) for s, e in DETECTORS[r.detector](view)]
+        for p in r.patterns:
+            for m in p.finditer(view):
+                keep = m.span("keep") if "keep" in p.groupindex and m.group("keep") is not None else None
+                cands.append((m.start(), m.end(), keep))
+        taken: list[Span] = []
+        for s, e, keep in sorted(cands, key=lambda c: c[:2]):
+            while s < e and text[s].isspace():
+                s += 1
+            while e > s and text[e - 1].isspace():
+                e -= 1
+            if s == e or any(s < e2 and e > s2 for s2, e2 in taken):
+                continue
+            taken.append((s, e))
+            found.append(Found(r, s, e, keep))
+    return sorted(found, key=lambda f: (f.start, f.rule.id))
+
+
+_INDENT = r"[ \t]*"
+_MARKER = r"(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+"
+_PREFIX = re.compile(_INDENT + "(?:" + _MARKER + ")?")
+_SENTENCE = re.compile(r"\S.*?(?:[.!?]+[\"')\]”’]*(?=\s|$)|$)")
+_DASH = re.compile(r"[ \t]*[—–][ \t]*|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)")
+_SPACED_DASH = re.compile(r"(?<=\S)[ \t]+(?:—|–|--?)[ \t]+(?=\S)")
+
+
+def _sentences(text: str) -> list[Span]:
+    out, pos = [], 0
+    for line in mask(text, "x").split("\n"):
+        body = _PREFIX.match(line).end()
+        out += [(pos + m.start(), pos + m.end()) for m in _SENTENCE.finditer(line, body)]
+        pos += len(line) + 1
+    return out
+
+
+@dataclass(frozen=True)
+class Edit:
+    start: int
+    end: int
+    text: str
+
+
+Plan = tuple[Edit, ...]
+
+
+class Rewriter(NamedTuple):
+    plan: Callable[[str, Found], Plan]
+    note: str
+
+
+def _case_like(rep: str, orig: str) -> str:
+    return rep[:1].upper() + rep[1:] if orig[:1].isupper() else rep
+
+
+def _lower_first(s: str) -> str:
+    head = s.split(" ", 1)[0]
+    return s if head == "I" or (len(head) > 1 and head.isupper()) else s[:1].lower() + s[1:]
+
+
+def _plan_delete(text: str, f: Found) -> Plan:
+    keep = text[f.keep[0]:f.keep[1]] if f.keep else ""
+    return (Edit(f.start, f.end, _case_like(keep, text[f.start:f.end])),)
+
+
+def _plan_plain_word(text: str, f: Found) -> Plan:
+    word = text[f.start:f.end]
+    rep = PLAIN.get(word.lower())
+    return () if rep is None else (Edit(f.start, f.end, _case_like(rep, word)),)
+
+
+def _plan_dash_to_comma(text: str, f: Found) -> Plan:
+    view = mask(text)
+    a, b = next(((a, b) for a, b in _sentences(text) if a <= f.start < b), (f.start, f.end))
+    return tuple(Edit(m.start(), m.end(), ", ") for m in _DASH.finditer(view, a, b)
+                 if not _between_digits(view, m.start(), m.end()))
+
+
+def _plan_join_fragments(text: str, f: Found) -> Plan:
+    beats = re.findall(r"([^.!?]+)([.!?])", text[f.start:f.end])
+    if len(beats) < 2:
+        return ()
+    words = [beats[0][0].strip()] + [_lower_first(b.strip()) for b, _ in beats[1:]]
+    return (Edit(f.start, f.end, ", ".join(words[:-1]) + ", and " + words[-1] + beats[-1][1]),)
+
+
+def _plan_state_directly(text: str, f: Found) -> Plan:
+    if not f.keep:
+        return ()
+    answer = text[f.keep[0]:f.keep[1]]
+    if len(answer.split()) >= 3:
+        return (Edit(f.start, f.end, answer),)
+    question = text[f.start:f.keep[0]].rstrip().rstrip("?")
+    return (Edit(f.start, f.end, f"{question} is {_lower_first(answer)}"),)
+
+
+REWRITERS: dict[str, Rewriter] = {
+    "delete": Rewriter(_plan_delete,
+                       "Deletes the flagged words. When the pattern marks a part to keep, only that part stays."),
+    "plain-word": Rewriter(_plan_plain_word,
+                           "Swaps the word for a plain one, so leverage becomes use. A word with no plain entry is left for you."),
+    "dash-to-comma": Rewriter(_plan_dash_to_comma, "Turns every dash in the sentence into a comma."),
+    "join-fragments": Rewriter(_plan_join_fragments,
+                               "Joins the fragments into one sentence, so Plan. Build. Ship. becomes Plan, build, and ship."),
+    "state-directly": Rewriter(_plan_state_directly,
+                               "Keeps the answer as the sentence. A short answer becomes The result is the answer."),
+    "none": Rewriter(lambda text, f: (), "No automatic edit. The rewriter leaves this one for you."),
+}
+FLOOR_NOTE = "After any edit, a sentence left under 3 words or ending on a dangling word is removed."
 
 PLAIN = {
     "leverage": "use", "leverages": "uses", "leveraged": "used", "leveraging": "using",
@@ -222,6 +365,185 @@ PLAIN = {
 }
 
 
+def _plan(text: str, f: Found) -> Plan:
+    plan = REWRITERS[f.rule.rewriter].plan(text, f)
+    return () if any("\n" in text[e.start:e.end] for e in plan) else plan
+
+
+_DANGLING = {"a", "an", "the", "is", "are", "was", "were", "of", "to", "and", "or", "but", "with", "for", "your", "my"}
+
+
+class _SentenceRepair(NamedTuple):
+    text: str
+    kept: bool
+
+
+def _below_floor(s: str) -> bool:
+    words = [w for w in s.split() if re.search(r"\w", w)]
+    if not words or len(words) < 3 or not re.search(r"[^\W\d_]", s):
+        return True
+    return re.sub(r"\W", "", words[-1]).lower() in _DANGLING
+
+
+def _fix_articles(s: str, junctions: list[int]) -> str:
+    for j in sorted(junctions, reverse=True):
+        art = re.search(r"\b([Aa]n?)[ \t]+$", s[:j])
+        nxt = re.match(r"[ \t]*([A-Za-z])", s[j:])
+        if art and nxt:
+            want = "an" if nxt.group(1).lower() in "aeiou" else "a"
+            if art.group(1).lower() != want:
+                s = s[:art.start(1)] + _case_like(want, art.group(1)) + s[art.end(1):]
+    return s
+
+
+def _repair_sentence(s: str) -> _SentenceRepair:
+    s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"[ \t]+(?=[,.;:!?])", "", s)
+    s = _SPACED_DASH.sub(lambda m: m.group() if _between_digits(s, m.start(), m.end()) else ", ", s)
+    s = re.sub(r"([,;:])(?:[ \t]*[,;:])+", r"\1", s)
+    s = re.sub(r"[,;:][ \t]*(?=[.!?])", "", s)
+    s = re.sub(r"(?<!\.)\.\.(?!\.)", ".", s)
+    s = re.sub(r"^[\s,;:—–-]+", "", s)
+    s = re.sub(r"[\s,;:—–-]+(?=[.!?]*$)", "", s)
+    s = re.sub(r"\b(an?|the),", r"\1", s, flags=re.I)
+    m = re.match(r"(?:and|but|or)\s+(.*)", s, re.I | re.S)
+    if m and len(m.group(1).split()) >= 3:
+        s = m.group(1)
+    s = re.sub(r"^([\"'(\[“‘]*)([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
+    return _SentenceRepair(s, not _below_floor(s))
+
+
+@dataclass(frozen=True)
+class Outcome:
+    kind: Literal["replaced", "deleted", "dropped", "covered", "untouched"]
+    detail: str = ""
+
+    def suggestion(self) -> str:
+        return {"replaced": self.detail, "deleted": "(delete)", "dropped": "(removes the sentence)",
+                "covered": f"(handled by {self.detail})", "untouched": "(no automatic edit)"}[self.kind]
+
+
+def _units(edits: list[Edit], sents: list[Span]) -> list[tuple[int, int, list[Edit]]]:
+    spans = []
+    for e in edits:
+        touched = [s for s in sents if s[0] < e.end and e.start < s[1]]
+        spans.append((min([e.start] + [a for a, _ in touched]), max([e.end] + [b for _, b in touched])))
+    merged: list[Span] = []
+    for a, b in sorted(spans):
+        if merged and a < merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(b, merged[-1][1]))
+        else:
+            merged.append((a, b))
+    return [(a, b, [e for e in edits if a <= e.start and e.end <= b]) for a, b in merged]
+
+
+def _probe_removed(offset: int, ends: list[tuple[int, bool]]) -> bool:
+    return not next((kept for end, kept in ends if end >= offset), False)
+
+
+def _repair_unit(text: str, start: int, end: int, edits: list[Edit], probes: set[int]) -> tuple[str, set[int]]:
+    def shift(p: int) -> int:
+        return p - start + sum(len(e.text) - (e.end - e.start) for e in edits if e.end <= p)
+
+    body = text[start:end]
+    for e in sorted(edits, key=lambda e: -e.start):
+        body = body[:e.start - start] + e.text + body[e.end - start:]
+    junctions = [shift(e.start) for e in edits]
+    kept, ends = [], []
+    for m in _SENTENCE.finditer(mask(body, "x")):
+        a, b = m.span()
+        fixed = _repair_sentence(_fix_articles(body[a:b], [j - a for j in junctions if a <= j <= b]))
+        ends.append((b, fixed.kept))
+        if fixed.kept:
+            kept.append(fixed.text)
+    gone = {p for p in probes if start <= p < end and _probe_removed(shift(p), ends)}
+    return " ".join(kept), gone
+
+
+def _land(found: list[Found], plans: list[Plan]) -> tuple[list[bool], dict[Edit, str]]:
+    def _longest_plan_first(i: int) -> tuple[int, int, str]:
+        plan = plans[i]
+        start = min(e.start for e in plan)
+        end = max(e.end for e in plan)
+        return (start - end, start, found[i].rule.id)
+
+    landed, owner = [False] * len(found), {}
+    for i in sorted((i for i, p in enumerate(plans) if p), key=_longest_plan_first):
+        if all(e in owner for e in plans[i]):
+            landed[i] = True
+        elif not any(e.start < o.end and o.start < e.end for e in plans[i] for o in owner):
+            landed[i] = True
+            owner.update({e: found[i].rule.id for e in plans[i]})
+    return landed, owner
+
+
+def _rewrite(text: str, found: list[Found]) -> tuple[str, list[Outcome]]:
+    plans = [_plan(text, f) for f in found]
+    landed, owner = _land(found, plans)
+    if not owner:
+        return text, [Outcome("untouched")] * len(found)
+
+    edits = sorted(owner, key=lambda e: e.start)
+    units = _units(edits, _sentences(text))
+    probes = {e.start for e in edits} | {f.start for f, ok in zip(found, landed) if not ok}
+    rows: list[str | None] = []
+    gone: set[int] = set()
+    pos = 0
+    lines = text.split("\n")
+    if text.endswith("\n"):
+        lines.pop()
+    for line in lines:
+        lo, hi = pos, pos + len(line)
+        pos = hi + 1
+        mine = [u for u in units if lo <= u[0] < hi]
+        if not mine:
+            rows.append(line)
+            continue
+        plen = _PREFIX.match(line).end()
+        buf, cur = "", lo
+        for a, b, unit_edits in mine:
+            new, removed = _repair_unit(text, a, b, unit_edits, probes)
+            gone |= removed
+            head = buf + text[cur:a]
+            cur = b
+            if new:
+                buf = head + new
+            elif head[plen:].strip():
+                buf = head.rstrip(" \t")
+            else:
+                buf = head
+                cur += len(re.match(r"[ \t]*", text[b:hi]).group())
+        buf += text[cur:hi]
+        rows.append(buf if buf[plen:].strip() else None)
+
+    out: list[str] = []
+    seam = False
+    for row in rows:
+        if row is None:
+            seam = True
+            continue
+        if seam and not row.strip() and (not out or not out[-1].strip()):
+            seam = False
+            continue
+        seam = False
+        out.append(row)
+    if seam and out and not out[-1].strip():
+        out.pop()
+    result = "\n".join(out) + ("\n" if out and text.endswith("\n") else "")
+
+    outcomes = []
+    for f, plan, ok in zip(found, plans, landed):
+        if ok:
+            e = next((e for e in plan if e.start <= f.start < e.end), plan[0])
+            outcomes.append(Outcome("dropped") if e.start in gone else
+                            Outcome("replaced", e.text.strip()) if e.text.strip() else Outcome("deleted"))
+            continue
+        cover = next((e for e in owner if e.start <= f.start and f.end <= e.end), None)
+        outcomes.append(Outcome("covered", owner[cover]) if cover else
+                        Outcome("dropped") if f.start in gone else Outcome("untouched"))
+    return result, outcomes
+
+
 # ---------------------------------------------------------------- check
 def _line_col(text: str, idx: int) -> tuple[int, int]:
     line = text.count("\n", 0, idx) + 1
@@ -231,27 +553,6 @@ def _line_col(text: str, idx: int) -> tuple[int, int]:
 
 def word_count(text: str) -> int:
     return len(re.findall(r"\b[\w'’]+\b", mask(text)))
-
-
-def find_hits(text: str, rules: Iterable[Rule]) -> list[Hit]:
-    t = mask(text)
-    hits: list[Hit] = []
-    for r in rules:
-        spans: list[Span] = []
-        if r.detector:
-            spans += DETECTORS[r.detector](t)
-        for p in r.patterns:
-            spans += [m.span() for m in p.finditer(t) if m.end() > m.start()]
-        seen: list[Span] = []
-        for s, e in sorted(set(spans)):
-            if any(s < e2 and e > s2 for s2, e2 in seen):
-                continue  # de-dupe overlaps within a rule
-            seen.append((s, e))
-            frag = text[s:e]
-            ln, col = _line_col(text, s)
-            hits.append(Hit(r.id, r.name, s, e, frag, r.why, r.fix, suggest(r, frag), ln, col))
-    hits.sort(key=lambda h: (h.start, h.rule))
-    return hits
 
 
 def score_hits(hits: list[Hit], rules: Iterable[Rule], words: int) -> tuple[int, dict, dict]:
@@ -271,110 +572,16 @@ def verdict_for(score: int) -> str:
     return "pass" if score >= PASS_AT else "warn" if score >= WARN_AT else "fail"
 
 
-def check(text: str, rules: list[Rule] | None = None, *, llm: bool = False, with_rewrite: bool = True) -> Report:
+def check(text: str, rules: list[Rule] | None = None, *, llm: bool = False) -> Report:
     rules = rules if rules is not None else load_rules()
-    hits = find_hits(text, rules)
+    found = _detect(text, rules)
+    rewritten, outcomes = _rewrite(text, found)
+    hits = [Hit(f.rule.id, f.rule.name, f.start, f.end, text[f.start:f.end], f.rule.why, f.rule.fix,
+                o.suggestion(), *_line_col(text, f.start)) for f, o in zip(found, outcomes)]
     words = word_count(text)
     score, by_rule, pen = score_hits(hits, rules, words)
-    rep = Report(score, verdict_for(score), words, hits, by_rule, pen)
-    if with_rewrite:
-        rep.rewrite = rewrite(text, rules, hits)
+    rep = Report(score, verdict_for(score), words, hits, by_rule, pen, rewritten)
     if llm:
         from .llm import llm_pass
         rep.llm = llm_pass(text, rep)
     return rep
-
-
-# ---------------------------------------------------------------- rewrite
-def _fix_not_x(frag: str) -> str:
-    m = re.search(r"^(.*?)\bnot (?:just |only |merely )?(?:a |an |about )?[^.,;!?\n]{1,40},? but (?:rather )?(.*)$", frag, re.I | re.S)
-    if m:
-        return (m.group(1) + m.group(2)).strip()
-    m = re.search(r"^(\w+)(?:'s| is|n't)?.*?[,;—–.-]\s*(?:it|this|that)(?:'s| is)\s*(.*)$", frag, re.I | re.S)
-    if m:
-        subj = m.group(1)
-        subj = subj if subj.lower() in ("it", "this", "that") else "It"
-        return (f"{subj}'s " if subj.lower() == "it" else f"{subj} is ") + m.group(2).strip() if m.group(2) else frag
-    return frag
-
-
-def rewrite(text: str, rules: list[Rule] | None = None, hits: list[Hit] | None = None) -> str:
-    """Deterministic cleanup. Applies edits right-to-left so offsets stay valid."""
-    rules = rules if rules is not None else load_rules()
-    hits = hits if hits is not None else find_hits(text, rules)
-    edits: list[tuple[int, int, str]] = []
-    taken: list[Span] = []
-    order = {"TG006": 0, "TG013": 0, "TG014": 0, "TG017": 0, "TG001": 1}
-    for h in sorted(hits, key=lambda h: (order.get(h.rule, 5), h.start)):
-        s, e = h.start, h.end
-        rep: str | None = None
-        if h.rule in ("TG006", "TG014", "TG013", "TG017", "TG012", "TG003", "TG004"):
-            # drop the whole sentence/clause the tell lives in when it is short
-            ss = max(text.rfind(c, 0, s) for c in ".!?\n") + 1
-            m = re.search(r"[.!?]|(?=\n)", text[e:])
-            ee = e + (m.end() if m else len(text) - e)
-            sentence = text[ss:ee]
-            if h.rule in ("TG003", "TG004") and len(sentence.split()) > 12:
-                continue
-            if h.rule == "TG012" or len(sentence.split()) > 12:
-                rep, ee, ss = "", e, s
-                # also eat a following comma/space
-                mm = re.match(r",?\s*", text[ee:])
-                ee += mm.end() if mm else 0
-            s, e, rep = ss, ee, (rep if rep is not None else "")
-        elif h.rule == "TG002":
-            mm = re.match(r"\s*", text[e:])
-            e += mm.end() if mm else 0
-            rep = ""
-        elif h.rule == "TG011":
-            mm = re.match(r":?[ \t]*", text[e:])
-            e += mm.end() if mm else 0
-            rep = ""
-        elif h.rule == "TG005":
-            m = re.match(r"(.*?)\s+like an?\b", h.text, re.I)
-            rep = m.group(1) if m else h.text
-            mm = re.match(r"(?:[ \w-]*?analyst|[ \w-]*?engineer|[ \w-]*?consultant|[ \w-]*?designer|[ \w-]*?lawyer|[ \w-]*?developer|[ \w-]*?pro|[ \w-]*?expert)\b", text[e:])
-            e += mm.end() if mm else 0
-        elif h.rule == "TG015":
-            rep = ", " if text[s - 1:s] != " " else ", "
-            # normalise surrounding spaces
-            while s > 0 and text[s - 1] == " ":
-                s -= 1
-            while e < len(text) and text[e] == " ":
-                e += 1
-        elif h.rule == "TG010":
-            w = h.text.lower()
-            if w in PLAIN:
-                rep = PLAIN[w]
-                if rep == "":
-                    mm = re.match(r",?\s*", text[e:])
-                    e += mm.end() if mm else 0
-            else:
-                continue
-        elif h.rule == "TG001":
-            rep = _fix_not_x(h.text)
-        elif h.rule == "TG009":
-            mm = re.match(r"[ \t]*", text[e:])
-            e += mm.end() if mm else 0
-            rep = ""
-        elif h.rule == "TG007":
-            rep = h.suggestion
-        elif h.rule == "TG016":
-            m = re.match(r"(.*?)\?\s+(.*)$", h.text, re.S)
-            rep = m.group(2) if m else h.text
-        else:
-            continue
-        if any(s < e2 and e > s2 for s2, e2 in taken):
-            continue
-        taken.append((s, e))
-        edits.append((s, e, rep))
-    out = text
-    for s, e, rep in sorted(edits, key=lambda x: -x[0]):
-        out = out[:s] + rep + out[e:]
-    out = re.sub(r"[ \t]{2,}", " ", out)
-    out = re.sub(r" +([,.!?])", r"\1", out)
-    out = re.sub(r",\s*,", ",", out)
-    out = re.sub(r"\n{3,}", "\n\n", out)
-    out = re.sub(r"(?m)^[ \t]+|[ \t]+$", "", out)
-    out = re.sub(r"(^|[.!?]\s+)([a-z])", lambda m: m.group(1) + m.group(2).upper(), out.strip())
-    return out

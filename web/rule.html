@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>$id $name · Tells Gate</title>
+<style>
+:root{--bg:#0f1115;--panel:#171a21;--ink:#e8eaf0;--dim:#8b93a7;--pass:#2fbf71;--warn:#f0b429;--fail:#ef4444}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--ink)}
+header{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid #232734}
+header h1{font-size:18px;margin:0}header a{color:var(--ink);text-decoration:none}header .tag{color:var(--dim);font-size:13px}
+main{max-width:860px;padding:18px 22px;display:grid;gap:18px}
+.panel{background:var(--panel);border:1px solid #232734;border-radius:12px;padding:14px 18px}
+h2{font-size:22px;margin:0 0 10px}h2 .rid{font:16px ui-monospace,monospace;color:var(--warn);margin-right:8px}
+h3{font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--dim);margin:0 0 8px}
+dl{display:grid;grid-template-columns:90px 1fr;gap:6px 14px;margin:0}dt{color:var(--dim)}dd{margin:0}
+p{margin:0 0 8px}.dim{color:var(--dim);font-size:13px}
+table{width:100%;border-collapse:collapse;margin-top:10px}th{text-align:left;color:var(--dim);font-weight:400;width:110px;vertical-align:top;padding:6px 0}
+td{padding:6px 0;white-space:pre-wrap}td.before{color:var(--fail)}td.after{color:var(--pass);font-weight:600}
+</style></head><body>
+<header><h1><a href="/">Tells Gate</a></h1><span class="tag">rule page</span></header>
+<main>
+<section class="panel">
+  <h2><span class="rid">$id</span>$name</h2>
+  <dl>
+    <dt>Why</dt><dd>$why</dd>
+    <dt>Fix</dt><dd>$fix</dd>
+    <dt>Cost</dt><dd>$weight points per hit, at most $cap, before density scaling</dd>
+  </dl>
+</section>
+<section class="panel">
+  <h3>What the rewriter does</h3>
+  <p>$note</p>
+  <p class="dim">$floor</p>
+  <table>
+    <tr><th>Example</th><td class="before">$example</td></tr>
+    <tr><th>Flagged</th><td>$flagged</td></tr>
+    <tr><th>Suggestion</th><td>$suggestion</td></tr>
+    <tr><th>Rewrite</th><td class="after">$after</td></tr>
+  </table>
+</section>
+</main>
+</body></html>

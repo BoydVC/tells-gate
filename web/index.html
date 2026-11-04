@@ -23,8 +23,9 @@ main{display:grid;grid-template-columns:1.4fr 1fr;gap:18px;padding:18px 22px}
 ul.hits{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto}
 ul.hits li{padding:8px 10px;border-radius:8px;margin-bottom:6px;background:#1d212b;cursor:pointer}
 ul.hits li:hover{background:#252a36}
-.rid{font:12px ui-monospace,monospace;color:var(--warn)}.frag{font-weight:600}.fix{color:var(--dim);font-size:13px}
+.rid{font:12px ui-monospace,monospace;color:var(--warn);text-decoration:none}a.rid:hover{text-decoration:underline}.frag{font-weight:600}.fix{color:var(--dim);font-size:13px}
 button{background:#1d9bf0;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
 button.ghost{background:#232734}
 .row{display:flex;gap:8px;margin-top:10px}.meta{color:var(--dim);font-size:13px}
 .empty{color:var(--pass);padding:10px}
@@ -62,13 +63,14 @@ function render(r){last=r;const text=ta.value;$('score').textContent=r.score;$('
  const b=$('bar');b.style.width=r.score+'%';b.style.background=`var(--${r.verdict})`;
  $('meta').textContent=`${r.words} words · ${r.hits.length} tells`;
  const ul=$('hits');ul.innerHTML=r.hits.length?'':'<li class="empty">No tells found. Ship it.</li>';
- r.hits.forEach(h=>{const li=document.createElement('li');li.innerHTML=`<div><span class="rid">${h.rule} ${h.name}</span> · <span class="frag">“${esc(h.text.trim().slice(0,60))}”</span></div><div class="fix">${esc(h.fix)} → <b>${esc(h.suggestion)}</b></div>`;
+ r.hits.forEach(h=>{const li=document.createElement('li');li.innerHTML=`<div><a class="rid" href="/rules/${h.rule}">${h.rule} ${h.name}</a> · <span class="frag">“${esc(h.text.trim().slice(0,60))}”</span></div><div class="fix">${esc(h.fix)} → <b>${esc(h.suggestion)}</b></div>`;
   li.onmouseenter=()=>paint(text,r.hits,h);li.onmouseleave=()=>paint(text,r.hits);ul.appendChild(li)});
+ $('apply').disabled=r.rewrite===text;
  paint(text,r.hits);}
 async function run(){const text=ta.value;const res=await fetch('/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});render(await res.json());}
 ta.addEventListener('input',()=>{paint(ta.value,[]);clearTimeout(timer);timer=setTimeout(run,150)});
 ta.addEventListener('scroll',()=>{mirror.scrollTop=ta.scrollTop});
-$('apply').onclick=()=>{if(last&&last.rewrite){ta.value=last.rewrite;run()}};
+$('apply').onclick=()=>{if(last&&last.rewrite!==ta.value){ta.value=last.rewrite;run()}};
 $('sample').onclick=()=>{ta.value=SAMPLE;run()};
-const q=new URLSearchParams(location.search);ta.value=q.get('text')||SAMPLE;run();
+const q=new URLSearchParams(location.search);ta.value=q.has('text')?q.get('text'):SAMPLE;run();
 </script></body></html>

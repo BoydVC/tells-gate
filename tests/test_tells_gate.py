@@ -1,25 +1,29 @@
 """Behavior tests. Synthetic text only."""
 import json
+import re
 import subprocess
-import sys
 import threading
 import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+from tells_gate import check, load_rules
+from tells_gate.core import parse_banned, mask, REWRITERS
+from tells_gate.server import make_handler
 
-from tells_gate import check, load_rules, rewrite  # noqa: E402
-from tells_gate.core import parse_banned, mask  # noqa: E402
-from tells_gate.server import make_handler  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
 
 RULES = load_rules()
+SAMPLES = ROOT / "tests/samples"
 
 
 def ids(text):
-    return {h.rule for h in check(text, RULES, with_rewrite=False).hits}
+    return {h.rule for h in check(text, RULES).hits}
+
+
+def rewritten(text):
+    return check(text, RULES).rewrite
 
 
 class TestBanned(unittest.TestCase):
@@ -47,6 +51,19 @@ class TestBanned(unittest.TestCase):
         with self.assertRaises(ValueError):
             parse_banned(md)
 
+    def test_parse_rejects_unknown_rewriter(self):
+        with self.assertRaises(ValueError):
+            parse_banned("## TG999 x\n- pattern: x\n- rewriter: nope\n")
+
+    def test_every_rule_names_a_registered_rewriter(self):
+        self.assertEqual(len(RULES), 17)
+        for r in RULES:
+            with self.subTest(rule=r.id):
+                self.assertIn(r.rewriter, REWRITERS)
+
+    def test_every_rule_has_bad_fixtures(self):
+        self.assertEqual(set(BAD), {r.id for r in RULES})
+
     def test_custom_banned_file_is_honored(self):
         rules = parse_banned("## TG900 synergy\n- why: w\n- fix: f\n- weight: 50\n- cap: 50\n- pattern: \\bwidget\\b\n")
         rep = check("The widget is ready.", rules)
@@ -56,17 +73,19 @@ class TestBanned(unittest.TestCase):
 
 BAD = {
     "TG001": ["It's not a chatbot, it's a coworker.", "This is not about speed, it's about trust.",
-              "We built not a tool but a teammate.", "That isn't just a feature. It's a platform."],
+              "We built not a tool but a teammate.", "That isn't just a feature. It's a platform.",
+              "It's not about speed but about trust.", "It’s not a chatbot, it’s a coworker."],
     "TG002": ["Apple quietly released an update."],
-    "TG003": ["Set this up before Monday.", "Try it this weekend.", "Don't wait."],
+    "TG003": ["Set this up before Monday.", "Try it this weekend.", "Don't wait.", "Don't sleep on this."],
     "TG004": ["Most people use ChatGPT wrong.", "You're probably using it wrong.", "99% of developers miss this."],
     "TG005": ["It can now code like a senior engineer.", "Grok can now research like a $200/hour analyst."],
     "TG006": ["That's the whole game.", "Let that sink in.", "Read that again.", "And that changes everything."],
-    "TG007": ["Plan. Build. Ship.", "Dream big. Start small. Win."],
+    "TG007": ["Plan. Build. Ship.", "Dream big. Start small. Win.", "Red. Blue. Green."],
     "TG008": ["You get speed, clarity, and confidence."],
     "TG009": ["A powerful, seamless, intuitive app."],
-    "TG010": ["We leverage AI to delve into data.", "A cutting-edge, next-level stack."],
-    "TG011": ["🚨 New model out", "BREAKING: rates cut", "Full thread 🧵"],
+    "TG010": ["We leverage AI to delve into data.", "A cutting-edge, next-level stack.", "The plan is robust."],
+    "TG011": ["🚨 New model out", "BREAKING: rates cut", "Full thread 🧵", "JUST IN: a new model shipped today.",
+              "Full guide -> link in bio"],
     "TG012": ["It's worth noting that this is arguably faster."],
     "TG013": ["Let's dive in. Here's the plan.", "Here's the thing: it works."],
     "TG014": ["In conclusion, it works.", "Hope this helps!", "Follow for more."],
@@ -90,6 +109,23 @@ GOOD = [
     "Quiet hours start at 10.",
 ]
 
+NEAR = {
+    "TG001": ["It was not a touchdown, but a field goal.", "I did not go, but she did.",
+              "The kick was not a touchdown but a field goal.", "This is not ready yet."],
+    "TG003": ["Don't wait for the lock to clear.", "Don’t wait for the lock.", "Don't wait until midnight.",
+              "Don't wait until midnight to start."],
+    "TG004": ["Most developers use Git.", "Most people get colds in winter.", "90% of users still prefer the old flag."],
+    "TG005": ["We built it like a prototype.", "Now build like a prototype, then harden it."],
+    "TG006": ["This is the way the parser works.", "That is the way we tested it."],
+    "TG007": ["TD. FG. Safety.", "Dr. Jones left. She cried. He ran."],
+    "TG008": ["The cache is fast, simple, and reliable.", "Keep it simple, clear, and bold."],
+    "TG010": ["The estimator is robust to outliers.", "The fit is robust against noise."],
+    "TG011": ["Setup steps -> linked from the README.", "The parts arrived JUST IN time."],
+    "TG014": ["In conclusion, plants need sunlight to make their own food."],
+    "TG015": ["Final: 27 - 20. The half ended 14 - 10."],
+    "TG016": ["Why? Because the moon has no air.", "How? It bounces off the ice."],
+}
+
 
 class TestRules(unittest.TestCase):
     def test_bad_samples_flag_expected_rule(self):
@@ -102,6 +138,12 @@ class TestRules(unittest.TestCase):
         for s in GOOD:
             with self.subTest(text=s):
                 self.assertEqual(ids(s), set())
+
+    def test_near_misses_are_clean(self):
+        for rid, lines in NEAR.items():
+            for s in lines:
+                with self.subTest(rule=rid, text=s):
+                    self.assertEqual(ids(s), set())
 
     def test_single_em_dash_in_short_post_is_fine(self):
         self.assertNotIn("TG015", ids("The fix shipped — finally."))
@@ -145,7 +187,8 @@ class TestScore(unittest.TestCase):
     def test_good_files_pass(self):
         for f in (ROOT / "tests/samples/good").glob("*.md"):
             with self.subTest(f=f.name):
-                self.assertEqual(check(f.read_text(), RULES).score, 100)
+                r = check(f.read_text(), RULES)
+                self.assertEqual((r.score, r.hits), (100, []))
 
     def test_bad_files_fail(self):
         for f in (ROOT / "tests/samples/bad").glob("*.md"):
@@ -175,28 +218,97 @@ class TestScore(unittest.TestCase):
         self.assertEqual((r.score, r.words, r.hits), (100, 0, []))
 
 
+def sample_texts():
+    return {f.name: f.read_text() for f in sorted(SAMPLES.glob("*/*.md"))}
+
+
+def sentences(text):
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n", text) if s.strip()]
+
+
+ORPHAN = re.compile(r"^[,;:—–-]|[,;:—–-][.!?]*$|(?<!\.)\.\.(?!\.)|\b[Aa] [aeiou]|^\W+$|— and| -- and")
+
+
 class TestRewrite(unittest.TestCase):
-    def test_rewrite_improves_bad_samples(self):
-        for f in (ROOT / "tests/samples/bad").glob("*.md"):
+    def test_rewrite_lifts_bad_files(self):
+        for f in (SAMPLES / "bad").glob("*.md"):
             t = f.read_text()
             with self.subTest(f=f.name):
-                self.assertGreater(check(rewrite(t, RULES), RULES).score, check(t, RULES).score + 30)
+                self.assertGreater(check(rewritten(t), RULES).score, check(t, RULES).score + 30)
 
-    def test_rewrite_leaves_clean_text_alone(self):
-        for s in GOOD:
-            self.assertEqual(rewrite(s, RULES), s)
+    def test_clean_text_is_byte_identical(self):
+        texts = GOOD + [f.read_text() for f in (SAMPLES / "good").glob("*.md")]
+        texts += ["Keep.\n", "Run it:\n\n```\n  leverage --quietly\n```\n", "  indented\n"]
+        for t in texts:
+            with self.subTest(text=t[:40]):
+                self.assertEqual(rewritten(t), t)
+
+    def test_untouched_lines_keep_their_bytes(self):
+        doc = "Title line\n\n  Indented note stays.  \n\nIt quietly shipped on Friday after the review.\n\n```\nx  =  1\n```\n"
+        self.assertEqual(rewritten(doc), doc.replace("It quietly shipped", "It shipped"))
 
     def test_rewrite_specific_fixes(self):
-        self.assertEqual(rewrite("Claude quietly shipped it.", RULES), "Claude shipped it.")
-        self.assertEqual(rewrite("It's not a chatbot, it's a coworker.", RULES), "It's a coworker.")
-        self.assertEqual(rewrite("We shipped it. That's the whole game.", RULES), "We shipped it.")
-        self.assertEqual(rewrite("Plan. Build. Ship.", RULES), "Plan.")
-        self.assertEqual(rewrite("🚨 New model out", RULES), "New model out")
-        self.assertNotIn("leverage", rewrite("We leverage caching.", RULES))
+        cases = {
+            "Claude quietly shipped it.": "Claude shipped it.",
+            "It's not a chatbot, it's a coworker.": "It's a coworker.",
+            "We shipped it. That's the whole game.": "We shipped it.",
+            "Plan. Build. Ship.": "Plan, build, and ship.",
+            "Write. Edit. Ship.": "Write, edit, and ship.",
+            "Dream big. Start small. Win.": "Dream big, start small, and win.",
+            "The result? Pure magic.": "The result is pure magic.",
+            "The catch? It costs money.": "It costs money.",
+            "🚨 New model out": "New model out",
+        }
+        for before, after in cases.items():
+            with self.subTest(text=before):
+                self.assertEqual(rewritten(before), after)
+        self.assertNotIn("leverage", rewritten("We leverage caching."))
 
     def test_rewrite_keeps_paragraphs(self):
-        out = rewrite("First line quietly.\n\nSecond line.", RULES)
-        self.assertEqual(out, "First line.\n\nSecond line.")
+        out = rewritten("The first line quietly.\n\nSecond line stays.")
+        self.assertEqual(out, "The first line.\n\nSecond line stays.")
+
+    def test_untouched_short_sentence_survives(self):
+        self.assertEqual(rewritten("Ship it. It quietly works for the whole team today."),
+                         "Ship it. It works for the whole team today.")
+
+    def test_repair_fixes_the_junction(self):
+        self.assertEqual(rewritten("We shipped a seamless app today."), "We shipped an app today.")
+        self.assertEqual(rewritten("We built a seamless, fast app for the team."), "We built a fast app for the team.")
+        self.assertEqual(rewritten("But it quietly works for the whole team."), "It works for the whole team.")
+
+    def test_rewrites_read_as_sentences(self):
+        for t in sum(BAD.values(), []) + [f.read_text() for f in (SAMPLES / "bad").glob("*.md")]:
+            out = rewritten(t)
+            with self.subTest(text=t[:50], rewrite=out):
+                for s in sentences(out):
+                    self.assertGreaterEqual(len(s.split()), 3, s)
+                    self.assertIsNone(ORPHAN.search(s), s)
+
+    def test_hype_rewrite_names_the_fixes(self):
+        t = (SAMPLES / "bad/hype-thread.md").read_text()
+        out = rewritten(t)
+        for want in ("It's a coworker.", "The result is pure magic.", "Write, edit, and ship."):
+            self.assertIn(want, out)
+        for residue in ("It's a coworker. Write.", "Pure magic.", "— and", " -- and"):
+            self.assertNotIn(residue, out)
+
+    def test_rewrite_never_lowers_score(self):
+        for t in sum(BAD.values(), []) + GOOD + sum(NEAR.values(), []) + list(sample_texts().values()):
+            with self.subTest(text=t[:50]):
+                self.assertGreaterEqual(check(rewritten(t), RULES).score, check(t, RULES).score)
+
+    def test_suggestion_tells_the_truth(self):
+        for t in sum(BAD.values(), []) + list(sample_texts().values()):
+            rep = check(t, RULES)
+            for h in rep.hits:
+                with self.subTest(text=t[:50], rule=h.rule, suggestion=h.suggestion):
+                    if h.suggestion in ("(delete)", "(removes the sentence)"):
+                        self.assertNotIn(h.text, rep.rewrite)
+                    elif h.suggestion == "(no automatic edit)":
+                        self.assertIn(h.text, rep.rewrite)
+                    elif not h.suggestion.startswith("(handled by "):
+                        self.assertIn(h.suggestion, rep.rewrite)
 
     def test_llm_flag_is_stubbed_offline(self):
         r = check("hello", RULES, llm=True)
@@ -231,6 +343,34 @@ class TestCLI(unittest.TestCase):
     def test_rules_listing(self):
         p = self.run_cli("rules")
         self.assertIn("TG001", p.stdout)
+        self.assertIn("join-fragments", p.stdout)
+
+    def test_diff_on_bad_file(self):
+        p = self.run_cli("check", "--diff", str(SAMPLES / "bad/hype-thread.md"))
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("--- ", p.stdout)
+        self.assertIn("+It's a coworker. Write, edit, and ship.\n", p.stdout)
+        self.assertIn("-Most people use AI wrong.", p.stdout)
+        self.assertNotIn("/100", p.stdout)
+        self.assertIn("0/100 FAIL", p.stderr)
+
+    def test_diff_on_good_file_is_empty(self):
+        p = self.run_cli("check", "--diff", str(SAMPLES / "good/plain-update.md"))
+        self.assertEqual((p.returncode, p.stdout), (0, ""))
+        self.assertIn("100/100 PASS", p.stderr)
+
+    def test_diff_exit_code_uses_original_score(self):
+        p = self.run_cli("check", "--diff", "--min-score", "99", "-", stdin="It quietly works.")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("--- a/stdin", p.stdout)
+
+    def test_json_diff_field(self):
+        bad = json.loads(self.run_cli("check", "--json", "--diff", str(SAMPLES / "bad/hype-thread.md")).stdout)
+        good = json.loads(self.run_cli("check", "--json", "--diff", str(SAMPLES / "good/plain-update.md")).stdout)
+        plain = json.loads(self.run_cli("check", "--json", str(SAMPLES / "bad/hype-thread.md")).stdout)
+        self.assertTrue(bad["diff"].startswith("--- "))
+        self.assertIsNone(good["diff"])
+        self.assertNotIn("diff", plain)
 
 
 class TestHTTP(unittest.TestCase):
@@ -274,6 +414,27 @@ class TestHTTP(unittest.TestCase):
             self.assertEqual(len(json.load(r)), len(RULES))
         with urllib.request.urlopen(self.url + "/?text=hello") as r:
             self.assertIn(b"Tells Gate", r.read())
+
+    def get_page(self, path):
+        try:
+            with urllib.request.urlopen(self.url + path) as r:
+                return r.status, r.headers["Content-Type"], r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers["Content-Type"], e.read().decode()
+
+    def test_rule_page_shows_the_landed_rewrite(self):
+        rule = next(r for r in RULES if r.id == "TG001")
+        code, ctype, body = self.get_page("/rules/TG001")
+        self.assertEqual(code, 200)
+        self.assertTrue(ctype.startswith("text/html"))
+        for want in (rule.why, rule.fix, rule.example, "It's a coworker."):
+            self.assertIn(want, body)
+
+    def test_rule_page_for_manual_rule_and_unknown_rule(self):
+        self.assertIn("No automatic edit", self.get_page("/rules/TG008")[2])
+        code, ctype, body = self.get_page("/rules/TG999")
+        self.assertEqual(code, 404)
+        self.assertEqual(json.loads(body), {"error": "unknown rule"})
 
 
 if __name__ == "__main__":

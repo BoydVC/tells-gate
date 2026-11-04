@@ -1,18 +1,38 @@
-"""Tiny stdlib HTTP server: GET / (live page), POST /check, GET /rules, GET /health."""
 from __future__ import annotations
 
+import html
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from string import Template
 from urllib.parse import urlparse
 
-from .core import check, load_rules, PASS_AT, WARN_AT
+from .core import check, load_rules, FLOOR_NOTE, PASS_AT, WARN_AT
 
 PAGE = Path(__file__).resolve().parent.parent / "web" / "index.html"
+RULE_PAGE = Path(__file__).resolve().parent.parent / "web" / "rule.html"
 MAX_BYTES = 200_000
 
 
+def landed_rule_page(rule, rules) -> bytes:
+    rep = check(rule.example, rules)
+    mine = [h for h in rep.hits if h.rule == rule.id]
+
+    def esc(s: str) -> str:
+        return html.escape(s, quote=False)
+
+    return Template(RULE_PAGE.read_text(encoding="utf-8")).substitute(
+        id=esc(rule.id), name=esc(rule.name), why=esc(rule.why), fix=esc(rule.fix),
+        weight=f"{rule.weight:g}", cap=f"{rule.cap:g}", note=esc(rule.rewriter_note), floor=esc(FLOOR_NOTE),
+        example=esc(rule.example), flagged=esc(" / ".join(f"“{h.text}”" for h in mine)),
+        suggestion=esc(" / ".join(h.suggestion for h in mine)),
+        after=esc(rep.rewrite) if rep.rewrite else "(the rewrite removes the whole example)",
+    ).encode()
+
+
 def make_handler(rules):
+    by_id = {r.id: r for r in rules}
+
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -39,6 +59,11 @@ def make_handler(rules):
             if path == "/rules":
                 return self._send(200, [{"id": r.id, "name": r.name, "why": r.why, "fix": r.fix,
                                          "weight": r.weight, "cap": r.cap, "example": r.example} for r in rules])
+            if path.startswith("/rules/"):
+                rule = by_id.get(path.removeprefix("/rules/"))
+                if rule is None:
+                    return self._send(404, {"error": "unknown rule"})
+                return self._send(200, landed_rule_page(rule, rules), "text/html")
             self._send(404, {"error": "not found"})
 
         def do_POST(self):

@@ -60,6 +60,7 @@ that re-POSTs with `{"force": true}`. The human still taps Post on X; nothing au
 `POST /check` with `{"text": str, "min_score"?: int, "llm"?: bool}` returns
 `{score, verdict, words, hits[{rule,name,start,end,text,why,fix,suggestion,line,col}], by_rule, penalties, rewrite, llm, gate}`.
 `gate` is `block` when `score < min_score` (or verdict `fail`, <60, if no min_score). Offsets are Unicode code points.
+Each hit's `suggestion` is what `rewrite` did to that hit.
 
 ## Smoke test after applying
 
