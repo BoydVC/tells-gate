@@ -39,7 +39,7 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - pattern: \b(?:set|do|try|start|build|learn) (?:this|it) (?:up )?(?:before|by) (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tonight|the weekend|next week)\b
 - pattern: \b(?:do|try|set up|build) (?:this|it) (?:this|over the) weekend\b
 - pattern: \bbefore it'?s too late\b
-- pattern: \b(?:don't|do not) (?:wait|sleep on this)\b
+- pattern: \b(?:don't|do not) (?:wait|sleep on this)(?=\s*[.!]|\s*$| (?:until|till) (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|next week))
 - example: Set this up before Monday.
 - rewriter: delete
 
@@ -48,7 +48,8 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - fix: Talk to the one reader. Say what you do instead.
 - weight: 8
 - cap: 16
-- pattern: \b(?:most|99%|90%) (?:of )?(?:people|founders|devs|developers|users|of you)\b(?: are)? (?:use|using|get|getting|do|doing|still|don't|won't|miss)
+- pattern: \b(?:most|99%|90%) (?:of )?(?:people|founders|devs|developers|users|of you)\b(?: are)?(?: still)? (?:use|using|get|getting|do|doing)\b[^.!?\n]{0,30}?\bwrong\b
+- pattern: \b(?:most|99%|90%) (?:of )?(?:people|founders|devs|developers|users|of you)\b (?:miss|don't know|won't tell you) (?:this|it)\b
 - pattern: \byou(?:'re| are) (?:probably )?(?:using|doing) (?:it|this|ai|claude|chatgpt|grok) wrong\b
 - pattern: \beveryone (?:is|'s) sleeping on\b
 - example: Most people use Claude wrong.
@@ -69,13 +70,13 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - fix: Delete it. The sentence before it already said it.
 - weight: 7
 - cap: 21
-- pattern: \bthat'?s the (?:whole|entire|real) (?:game|point|trick|secret)\b
-- pattern: \b(?:is|was) the part (?:everyone|most people|nobody) (?:skips|misses|ignores|talks about)\b
-- pattern: \b(?:and )?that changes everything\b
-- pattern: \blet that sink in\b
-- pattern: \bread that again\b
-- pattern: \bthe rest is history\b
-- pattern: \b(?:this|that) is the way\b
+- pattern: \bthat'?s the (?:whole|entire|real) (?:game|point|trick|secret)\b(?=\s*[.!?…]|\s*$)
+- pattern: \b(?:is|was) the part (?:everyone|most people|nobody) (?:skips|misses|ignores|talks about)\b(?=\s*[.!?…]|\s*$)
+- pattern: \b(?:and )?that changes everything\b(?=\s*[.!?…]|\s*$)
+- pattern: \blet that sink in\b(?=\s*[.!?…]|\s*$)
+- pattern: \bread that again\b(?=\s*[.!?…]|\s*$)
+- pattern: \bthe rest is history\b(?=\s*[.!?…]|\s*$)
+- pattern: \b(?:this|that) is the way\b(?=\s*[.!?…]|\s*$)
 - example: Setup is the part everyone skips. That's the whole game.
 - rewriter: delete
 
@@ -111,7 +112,7 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - fix: Use the plain word, or a number.
 - weight: 3
 - cap: 18
-- pattern: \b(?:delve|delves|delving|tapestry|testament to|game[- ]chang(?:er|ing)|revolutioni[sz]e[sd]?|unleash(?:es|ed)?|supercharge[sd]?|elevate[sd]? your|unlock(?:s|ed)? (?:the|your)|seamless(?:ly)?|robust|leverag(?:e|es|ed|ing)|cutting[- ]edge|next[- ]level|ever[- ]evolving|landscape of|realm of|navigate the complexit(?:y|ies)|paradigm shift|synerg(?:y|ies))\b
+- pattern: \b(?:delve|delves|delving|tapestry|testament to|game[- ]chang(?:er|ing)|revolutioni[sz]e[sd]?|unleash(?:es|ed)?|supercharge[sd]?|elevate[sd]? your|unlock(?:s|ed)? (?:the|your)|seamless(?:ly)?|robust(?! (?:to|against)\b)|leverag(?:e|es|ed|ing)|cutting[- ]edge|next[- ]level|ever[- ]evolving|landscape of|realm of|navigate the complexit(?:y|ies)|paradigm shift|synerg(?:y|ies))\b
 - example: Unlock the power of a seamless, cutting-edge workflow.
 - rewriter: plain-word
 
@@ -121,8 +122,8 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - weight: 8
 - cap: 16
 - pattern: 🚨|👇|⬇️|🧵|🔥{2,}
-- pattern: \b(?:BREAKING|HUGE|MASSIVE|JUST IN)\b
-- pattern: (?:^|\s)(?:→|->)\s*(?:https?://|link)
+- pattern: \b(?:BREAKING|HUGE|MASSIVE)\b|\bJUST IN(?=[ \t]*[:!]|[ \t]*$)
+- pattern: (?:^|\s)(?:→|->)\s*(?:https?://|link\b)
 - case: sensitive
 - example: 🚨 BREAKING: new model just dropped 👇
 - rewriter: delete
@@ -141,7 +142,7 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - fix: Start with the point.
 - weight: 5
 - cap: 10
-- pattern: (?:^|\n)\s*(?:in today's (?:fast-paced )?(?:world|digital age)|let'?s dive in|let'?s be honest|here'?s the thing|picture this|imagine a world|great question|in this (?:post|thread|article),? (?:i|we)(?:'ll| will)|ever wondered|buckle up)\b
+- pattern: ^[ \t]*(?:in today's (?:fast-paced )?(?:world|digital age)|let'?s dive in|let'?s be honest|here'?s the thing|picture this|imagine a world|great question|in this (?:post|thread|article),? (?:i|we)(?:'ll| will)|ever wondered|buckle up)\b
 - example: Let's dive in.
 - rewriter: delete
 
@@ -150,7 +151,7 @@ Inspired by @AISystems_hq and @Zephyr_hg ("a list with examples beats a vague
 - fix: End on the last real fact, or one specific question.
 - weight: 5
 - cap: 10
-- pattern: \b(?:in conclusion|in summary|at the end of the day|i hope this helps|hope this helps|what do you think\?|thoughts\?|let me know in the comments|follow for more|like and retweet|the future is (?:here|now|bright))
+- pattern: \b(?:in conclusion|in summary)\b(?=,?\s+[^.!?\n]{0,20}[.!?])|\b(?:at the end of the day|i hope this helps|hope this helps|what do you think\?|thoughts\?|let me know in the comments|follow for more|like and retweet|the future is (?:here|now|bright))
 - example: At the end of the day, the future is bright. Thoughts?
 - rewriter: delete
 

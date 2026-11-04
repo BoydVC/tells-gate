@@ -122,7 +122,7 @@ _HTML = re.compile(r"<[^>\n]+>")
 
 
 def mask(text: str, fill: str = " ") -> str:
-    """Blank out code, URLs and HTML with `fill` so offsets stay valid."""
+    """Blank out code, URLs and HTML with `fill` and fold curly apostrophes to ', so offsets stay valid."""
     def blank(m):
         return re.sub(r"[^\n]", fill, m.group(0))
     out = _CODE_FENCE.sub(blank, text)
@@ -130,7 +130,7 @@ def mask(text: str, fill: str = " ") -> str:
     out = _HTML.sub(blank, out)
     # keep URLs visible to the arrow rule: mask only the URL body after the scheme
     out = _URL.sub(lambda m: m.group(0)[:8] + fill * (len(m.group(0)) - 8), out)
-    return out
+    return out.replace("\u2019", "'").replace("\u2018", "'")
 
 
 # ---------------------------------------------------------------- detectors
@@ -145,15 +145,37 @@ ABSTRACT = {
     "power", "flexibility", "scale", "impact", "innovation", "productivity", "creativity",
     "connection", "freedom", "control", "insight", "insights", "value", "quality", "purpose",
     "passion", "community", "collaboration", "transparency", "accountability", "momentum",
-    "fast", "simple", "reliable", "secure", "smart", "faster", "smarter", "better", "cheaper",
-    "easier", "stronger", "safer", "clean", "clear", "bold",
 }
+ABBREVIATIONS = {"dr", "mr", "mrs", "ms", "st", "fig", "eq", "no", "vs", "jr", "sr"}
+_BEAT_RUN = re.compile(r"(?:(?<=^)|(?<=[\s>]))(?:[A-Z][\w'’-]*(?: [\w'’-]+)?[.!](?: |(?=\s|$)))+", re.M)
+_BEAT = re.compile(r"[A-Z][\w'’-]*(?: [\w'’-]+)?[.!]")
+
+
+def _between_digits(t: str, s: int, e: int) -> bool:
+    return bool(re.search(r"\d[ \t]*\Z", t[max(0, s - 8):s]) and re.match(r"[ \t]*\d", t[e:e + 8]))
 
 
 def det_triad_fragments(t: str) -> list[Span]:
     # three or more consecutive 1-2 word sentences: "Write. Edit. Ship."
-    pat = re.compile(r"(?:(?<=^)|(?<=[\s>]))((?:[A-Z][\w'’-]*(?: [\w'’-]+)?[.!] ){2,}[A-Z][\w'’-]*(?: [\w'’-]+)?[.!])(?=\s|$)", re.M)
-    return [m.span(1) for m in pat.finditer(t)]
+    # a beat with a word under 3 letters ("TD.") or an abbreviation ("Dr.") breaks the run,
+    # and the beat after an abbreviation is mid-sentence, so it cannot start one
+    out: list[Span] = []
+    for run in _BEAT_RUN.finditer(t):
+        streak: list[Span] = []
+        after_abbrev = False
+        for b in _BEAT.finditer(t, run.start(), run.end()):
+            words = b.group()[:-1].split()
+            abbrev = len(words) == 1 and words[0].lower() in ABBREVIATIONS
+            if not abbrev and all(len(re.sub(r"[^A-Za-z]", "", w)) >= 3 for w in words) and (streak or not after_abbrev):
+                streak.append(b.span())
+            else:
+                if len(streak) >= 3:
+                    out.append((streak[0][0], streak[-1][1]))
+                streak = []
+            after_abbrev = abbrev
+        if len(streak) >= 3:
+            out.append((streak[0][0], streak[-1][1]))
+    return out
 
 
 def det_triad_list(t: str) -> list[Span]:
@@ -177,11 +199,11 @@ def det_adjective_pile(t: str) -> list[Span]:
 
 
 def det_em_dash_density(t: str) -> list[Span]:
-    # exempt numeric ranges (3–1, 8–10) and list labels ("- **Kickoff** — ...", "1. Kickoff — ...")
+    # exempt numbers on both sides (3–1, 27 - 20) and list labels ("- **Kickoff** — ...", "1. Kickoff — ...")
     label = re.compile(r"(?m)^\s*(?:[-*+]|\d+\.)\s+(?:\*\*[^*\n]{1,60}\*\*|`[^`\n]{1,60}`|\S[^—–\n]{0,40}?)\s*[—–]")
     exempt = {m.end() - 1 for m in label.finditer(t)}
     dashes = [m.span() for m in re.finditer(r"—|–|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)", t)
-              if m.start() not in exempt and not re.match(r"\d[–—]\d", t[max(0, m.start() - 1):m.end() + 1])]
+              if m.start() not in exempt and not _between_digits(t, *m.span())]
     words = max(1, len(re.findall(r"\b\w+\b", t)))
     allowed = max(1, int(words / 100))  # one dash per 100 words is fine
     return dashes[allowed:] if len(dashes) > allowed else []
@@ -232,10 +254,6 @@ _PREFIX = re.compile(r"[ \t]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+)?")
 _SENTENCE = re.compile(r"\S.*?(?:[.!?]+[\"')\]”’]*(?=\s|$)|$)")
 _DASH = re.compile(r"[ \t]*[—–][ \t]*|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)")
 _SPACED_DASH = re.compile(r"(?<=\S)[ \t]+(?:—|–|--?)[ \t]+(?=\S)")
-
-
-def _between_digits(t: str, s: int, e: int) -> bool:
-    return t[s - 1:s].isdigit() and t[e:e + 1].isdigit()
 
 
 def _sentences(text: str) -> list[Span]:
@@ -400,7 +418,8 @@ def _units(edits: list[Edit], sents: list[Span]) -> list[tuple[int, int, list[Ed
 
 
 def _repair_unit(text: str, start: int, end: int, edits: list[Edit], probes: set[int]) -> tuple[str, set[int]]:
-    """Apply a unit's edits, repair each sentence in it, and report which probe offsets no kept sentence holds."""
+    """Apply a unit's edits and repair each sentence in it. A probe offset is gone when the first
+    sentence ending at or after it was removed, or no sentence follows it."""
     def shift(p: int) -> int:
         return p - start + sum(len(e.text) - (e.end - e.start) for e in edits if e.end <= p)
 
@@ -408,14 +427,14 @@ def _repair_unit(text: str, start: int, end: int, edits: list[Edit], probes: set
     for e in sorted(edits, key=lambda e: -e.start):
         body = body[:e.start - start] + e.text + body[e.end - start:]
     junctions = [shift(e.start) for e in edits]
-    kept, spans = [], []
+    kept, ends = [], []
     for m in _SENTENCE.finditer(mask(body, "x")):
         a, b = m.span()
         fixed = _repair_sentence(_fix_articles(body[a:b], [j - a for j in junctions if a <= j <= b]))
+        ends.append((b, fixed is not None))
         if fixed is not None:
             kept.append(fixed)
-            spans.append((a, b))
-    gone = {p for p in probes if start <= p < end and not any(a <= shift(p) <= b for a, b in spans)}
+    gone = {p for p in probes if start <= p < end and not next((ok for b, ok in ends if b >= shift(p)), False)}
     return " ".join(kept), gone
 
 

@@ -75,17 +75,19 @@ class TestBanned(unittest.TestCase):
 
 BAD = {
     "TG001": ["It's not a chatbot, it's a coworker.", "This is not about speed, it's about trust.",
-              "We built not a tool but a teammate.", "That isn't just a feature. It's a platform."],
+              "We built not a tool but a teammate.", "That isn't just a feature. It's a platform.",
+              "It's not about speed but about trust.", "It’s not a chatbot, it’s a coworker."],
     "TG002": ["Apple quietly released an update."],
-    "TG003": ["Set this up before Monday.", "Try it this weekend.", "Don't wait."],
+    "TG003": ["Set this up before Monday.", "Try it this weekend.", "Don't wait.", "Don't sleep on this."],
     "TG004": ["Most people use ChatGPT wrong.", "You're probably using it wrong.", "99% of developers miss this."],
     "TG005": ["It can now code like a senior engineer.", "Grok can now research like a $200/hour analyst."],
     "TG006": ["That's the whole game.", "Let that sink in.", "Read that again.", "And that changes everything."],
-    "TG007": ["Plan. Build. Ship.", "Dream big. Start small. Win."],
+    "TG007": ["Plan. Build. Ship.", "Dream big. Start small. Win.", "Red. Blue. Green."],
     "TG008": ["You get speed, clarity, and confidence."],
     "TG009": ["A powerful, seamless, intuitive app."],
-    "TG010": ["We leverage AI to delve into data.", "A cutting-edge, next-level stack."],
-    "TG011": ["🚨 New model out", "BREAKING: rates cut", "Full thread 🧵"],
+    "TG010": ["We leverage AI to delve into data.", "A cutting-edge, next-level stack.", "The plan is robust."],
+    "TG011": ["🚨 New model out", "BREAKING: rates cut", "Full thread 🧵", "JUST IN: a new model shipped today.",
+              "Full guide -> link in bio"],
     "TG012": ["It's worth noting that this is arguably faster."],
     "TG013": ["Let's dive in. Here's the plan.", "Here's the thing: it works."],
     "TG014": ["In conclusion, it works.", "Hope this helps!", "Follow for more."],
@@ -109,6 +111,23 @@ GOOD = [
     "Quiet hours start at 10.",
 ]
 
+NEAR = {
+    "TG001": ["It was not a touchdown, but a field goal.", "I did not go, but she did.",
+              "The kick was not a touchdown but a field goal.", "This is not ready yet."],
+    "TG003": ["Don't wait for the lock to clear.", "Don’t wait for the lock.", "Don't wait until midnight.",
+              "Don't wait until midnight to start."],
+    "TG004": ["Most developers use Git.", "Most people get colds in winter.", "90% of users still prefer the old flag."],
+    "TG005": ["We built it like a prototype.", "Now build like a prototype, then harden it."],
+    "TG006": ["This is the way the parser works.", "That is the way we tested it."],
+    "TG007": ["TD. FG. Safety.", "Dr. Jones left. She cried. He ran."],
+    "TG008": ["The cache is fast, simple, and reliable.", "Keep it simple, clear, and bold."],
+    "TG010": ["The estimator is robust to outliers.", "The fit is robust against noise."],
+    "TG011": ["Setup steps -> linked from the README.", "The parts arrived JUST IN time."],
+    "TG014": ["In conclusion, plants need sunlight to make their own food."],
+    "TG015": ["Final: 27 - 20. The half ended 14 - 10."],
+    "TG016": ["Why? Because the moon has no air.", "How? It bounces off the ice."],
+}
+
 
 class TestRules(unittest.TestCase):
     def test_bad_samples_flag_expected_rule(self):
@@ -121,6 +140,12 @@ class TestRules(unittest.TestCase):
         for s in GOOD:
             with self.subTest(text=s):
                 self.assertEqual(ids(s), set())
+
+    def test_near_misses_are_clean(self):
+        for rid, lines in NEAR.items():
+            for s in lines:
+                with self.subTest(rule=rid, text=s):
+                    self.assertEqual(ids(s), set())
 
     def test_single_em_dash_in_short_post_is_fine(self):
         self.assertNotIn("TG015", ids("The fix shipped — finally."))
@@ -271,7 +296,7 @@ class TestRewrite(unittest.TestCase):
             self.assertNotIn(residue, out)
 
     def test_rewrite_never_lowers_score(self):
-        for t in sum(BAD.values(), []) + GOOD + list(sample_texts().values()):
+        for t in sum(BAD.values(), []) + GOOD + sum(NEAR.values(), []) + list(sample_texts().values()):
             with self.subTest(text=t[:50]):
                 self.assertGreaterEqual(check(rewritten(t), RULES).score, check(t, RULES).score)
 
