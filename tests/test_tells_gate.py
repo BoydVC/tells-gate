@@ -186,6 +186,13 @@ class TestRewrite(unittest.TestCase):
         for s in GOOD:
             self.assertEqual(rewrite(s, RULES), s)
 
+    def test_clean_text_is_byte_identical(self):
+        texts = GOOD + [f.read_text() for f in (ROOT / "tests/samples/good").glob("*.md")]
+        texts += ["Keep.\n", "Run it:\n\n```\n  leverage --quietly\n```\n", "  indented\n"]
+        for t in texts:
+            with self.subTest(text=t[:40]):
+                self.assertEqual(check(t, RULES).rewrite, t)
+
     def test_rewrite_specific_fixes(self):
         self.assertEqual(rewrite("Claude quietly shipped it.", RULES), "Claude shipped it.")
         self.assertEqual(rewrite("It's not a chatbot, it's a coworker.", RULES), "It's a coworker.")

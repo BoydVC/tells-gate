@@ -368,6 +368,8 @@ def rewrite(text: str, rules: list[Rule] | None = None, hits: list[Hit] | None =
             continue
         taken.append((s, e))
         edits.append((s, e, rep))
+    if not edits:
+        return text
     out = text
     for s, e, rep in sorted(edits, key=lambda x: -x[0]):
         out = out[:s] + rep + out[e:]
