@@ -1,5 +1,6 @@
 """Behavior tests. Synthetic text only."""
 import json
+import re
 import subprocess
 import sys
 import threading
@@ -11,15 +12,20 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tells_gate import check, load_rules, rewrite  # noqa: E402
-from tells_gate.core import parse_banned, mask  # noqa: E402
+from tells_gate import check, load_rules  # noqa: E402
+from tells_gate.core import parse_banned, mask, REWRITERS  # noqa: E402
 from tells_gate.server import make_handler  # noqa: E402
 
 RULES = load_rules()
+SAMPLES = ROOT / "tests/samples"
 
 
 def ids(text):
-    return {h.rule for h in check(text, RULES, with_rewrite=False).hits}
+    return {h.rule for h in check(text, RULES).hits}
+
+
+def rewritten(text):
+    return check(text, RULES).rewrite
 
 
 class TestBanned(unittest.TestCase):
@@ -46,6 +52,19 @@ class TestBanned(unittest.TestCase):
         md = "## TG001 a\n- pattern: a\n## TG001 b\n- pattern: b\n"
         with self.assertRaises(ValueError):
             parse_banned(md)
+
+    def test_parse_rejects_unknown_rewriter(self):
+        with self.assertRaises(ValueError):
+            parse_banned("## TG999 x\n- pattern: x\n- rewriter: nope\n")
+
+    def test_every_rule_names_a_registered_rewriter(self):
+        self.assertEqual(len(RULES), 17)
+        for r in RULES:
+            with self.subTest(rule=r.id):
+                self.assertIn(r.rewriter, REWRITERS)
+
+    def test_every_rule_has_bad_fixtures(self):
+        self.assertEqual(set(BAD), {r.id for r in RULES})
 
     def test_custom_banned_file_is_honored(self):
         rules = parse_banned("## TG900 synergy\n- why: w\n- fix: f\n- weight: 50\n- cap: 50\n- pattern: \\bwidget\\b\n")
@@ -145,7 +164,8 @@ class TestScore(unittest.TestCase):
     def test_good_files_pass(self):
         for f in (ROOT / "tests/samples/good").glob("*.md"):
             with self.subTest(f=f.name):
-                self.assertEqual(check(f.read_text(), RULES).score, 100)
+                r = check(f.read_text(), RULES)
+                self.assertEqual((r.score, r.hits), (100, []))
 
     def test_bad_files_fail(self):
         for f in (ROOT / "tests/samples/bad").glob("*.md"):
@@ -175,35 +195,97 @@ class TestScore(unittest.TestCase):
         self.assertEqual((r.score, r.words, r.hits), (100, 0, []))
 
 
+def sample_texts():
+    return {f.name: f.read_text() for f in sorted(SAMPLES.glob("*/*.md"))}
+
+
+def sentences(text):
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+|\n", text) if s.strip()]
+
+
+ORPHAN = re.compile(r"^[,;:—–-]|[,;:—–-][.!?]*$|(?<!\.)\.\.(?!\.)|\b[Aa] [aeiou]|^\W+$|— and| -- and")
+
+
 class TestRewrite(unittest.TestCase):
-    def test_rewrite_improves_bad_samples(self):
-        for f in (ROOT / "tests/samples/bad").glob("*.md"):
+    def test_rewrite_lifts_bad_files(self):
+        for f in (SAMPLES / "bad").glob("*.md"):
             t = f.read_text()
             with self.subTest(f=f.name):
-                self.assertGreater(check(rewrite(t, RULES), RULES).score, check(t, RULES).score + 30)
-
-    def test_rewrite_leaves_clean_text_alone(self):
-        for s in GOOD:
-            self.assertEqual(rewrite(s, RULES), s)
+                self.assertGreater(check(rewritten(t), RULES).score, check(t, RULES).score + 30)
 
     def test_clean_text_is_byte_identical(self):
-        texts = GOOD + [f.read_text() for f in (ROOT / "tests/samples/good").glob("*.md")]
+        texts = GOOD + [f.read_text() for f in (SAMPLES / "good").glob("*.md")]
         texts += ["Keep.\n", "Run it:\n\n```\n  leverage --quietly\n```\n", "  indented\n"]
         for t in texts:
             with self.subTest(text=t[:40]):
-                self.assertEqual(check(t, RULES).rewrite, t)
+                self.assertEqual(rewritten(t), t)
+
+    def test_untouched_lines_keep_their_bytes(self):
+        doc = "Title line\n\n  Indented note stays.  \n\nIt quietly shipped on Friday after the review.\n\n```\nx  =  1\n```\n"
+        self.assertEqual(rewritten(doc), doc.replace("It quietly shipped", "It shipped"))
 
     def test_rewrite_specific_fixes(self):
-        self.assertEqual(rewrite("Claude quietly shipped it.", RULES), "Claude shipped it.")
-        self.assertEqual(rewrite("It's not a chatbot, it's a coworker.", RULES), "It's a coworker.")
-        self.assertEqual(rewrite("We shipped it. That's the whole game.", RULES), "We shipped it.")
-        self.assertEqual(rewrite("Plan. Build. Ship.", RULES), "Plan.")
-        self.assertEqual(rewrite("🚨 New model out", RULES), "New model out")
-        self.assertNotIn("leverage", rewrite("We leverage caching.", RULES))
+        cases = {
+            "Claude quietly shipped it.": "Claude shipped it.",
+            "It's not a chatbot, it's a coworker.": "It's a coworker.",
+            "We shipped it. That's the whole game.": "We shipped it.",
+            "Plan. Build. Ship.": "Plan, build, and ship.",
+            "Write. Edit. Ship.": "Write, edit, and ship.",
+            "Dream big. Start small. Win.": "Dream big, start small, and win.",
+            "The result? Pure magic.": "The result is pure magic.",
+            "The catch? It costs money.": "It costs money.",
+            "🚨 New model out": "New model out",
+        }
+        for before, after in cases.items():
+            with self.subTest(text=before):
+                self.assertEqual(rewritten(before), after)
+        self.assertNotIn("leverage", rewritten("We leverage caching."))
 
     def test_rewrite_keeps_paragraphs(self):
-        out = rewrite("First line quietly.\n\nSecond line.", RULES)
-        self.assertEqual(out, "First line.\n\nSecond line.")
+        out = rewritten("The first line quietly.\n\nSecond line stays.")
+        self.assertEqual(out, "The first line.\n\nSecond line stays.")
+
+    def test_untouched_short_sentence_survives(self):
+        self.assertEqual(rewritten("Ship it. It quietly works for the whole team today."),
+                         "Ship it. It works for the whole team today.")
+
+    def test_repair_fixes_the_junction(self):
+        self.assertEqual(rewritten("We shipped a seamless app today."), "We shipped an app today.")
+        self.assertEqual(rewritten("We built a seamless, fast app for the team."), "We built a fast app for the team.")
+        self.assertEqual(rewritten("But it quietly works for the whole team."), "It works for the whole team.")
+
+    def test_rewrites_read_as_sentences(self):
+        for t in sum(BAD.values(), []) + [f.read_text() for f in (SAMPLES / "bad").glob("*.md")]:
+            out = rewritten(t)
+            with self.subTest(text=t[:50], rewrite=out):
+                for s in sentences(out):
+                    self.assertGreaterEqual(len(s.split()), 3, s)
+                    self.assertIsNone(ORPHAN.search(s), s)
+
+    def test_hype_rewrite_names_the_fixes(self):
+        t = (SAMPLES / "bad/hype-thread.md").read_text()
+        out = rewritten(t)
+        for want in ("It's a coworker.", "The result is pure magic.", "Write, edit, and ship."):
+            self.assertIn(want, out)
+        for residue in ("It's a coworker. Write.", "Pure magic.", "— and", " -- and"):
+            self.assertNotIn(residue, out)
+
+    def test_rewrite_never_lowers_score(self):
+        for t in sum(BAD.values(), []) + GOOD + list(sample_texts().values()):
+            with self.subTest(text=t[:50]):
+                self.assertGreaterEqual(check(rewritten(t), RULES).score, check(t, RULES).score)
+
+    def test_suggestion_tells_the_truth(self):
+        for t in sum(BAD.values(), []) + list(sample_texts().values()):
+            rep = check(t, RULES)
+            for h in rep.hits:
+                with self.subTest(text=t[:50], rule=h.rule, suggestion=h.suggestion):
+                    if h.suggestion in ("(delete)", "(removes the sentence)"):
+                        self.assertNotIn(h.text, rep.rewrite)
+                    elif h.suggestion == "(no automatic edit)":
+                        self.assertIn(h.text, rep.rewrite)
+                    elif not h.suggestion.startswith("(handled by "):
+                        self.assertIn(h.suggestion, rep.rewrite)
 
     def test_llm_flag_is_stubbed_offline(self):
         r = check("hello", RULES, llm=True)
