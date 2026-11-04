@@ -345,6 +345,34 @@ class TestCLI(unittest.TestCase):
     def test_rules_listing(self):
         p = self.run_cli("rules")
         self.assertIn("TG001", p.stdout)
+        self.assertIn("join-fragments", p.stdout)
+
+    def test_diff_on_bad_file(self):
+        p = self.run_cli("check", "--diff", str(SAMPLES / "bad/hype-thread.md"))
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("--- ", p.stdout)
+        self.assertIn("+It's a coworker. Write, edit, and ship.\n", p.stdout)
+        self.assertIn("-Most people use AI wrong.", p.stdout)
+        self.assertNotIn("/100", p.stdout)
+        self.assertIn("0/100 FAIL", p.stderr)
+
+    def test_diff_on_good_file_is_empty(self):
+        p = self.run_cli("check", "--diff", str(SAMPLES / "good/plain-update.md"))
+        self.assertEqual((p.returncode, p.stdout), (0, ""))
+        self.assertIn("100/100 PASS", p.stderr)
+
+    def test_diff_exit_code_uses_original_score(self):
+        p = self.run_cli("check", "--diff", "--min-score", "99", "-", stdin="It quietly works.")
+        self.assertEqual(p.returncode, 1)
+        self.assertIn("--- a/stdin", p.stdout)
+
+    def test_json_diff_field(self):
+        bad = json.loads(self.run_cli("check", "--json", "--diff", str(SAMPLES / "bad/hype-thread.md")).stdout)
+        good = json.loads(self.run_cli("check", "--json", "--diff", str(SAMPLES / "good/plain-update.md")).stdout)
+        plain = json.loads(self.run_cli("check", "--json", str(SAMPLES / "bad/hype-thread.md")).stdout)
+        self.assertTrue(bad["diff"].startswith("--- "))
+        self.assertIsNone(good["diff"])
+        self.assertNotIn("diff", plain)
 
 
 class TestHTTP(unittest.TestCase):
@@ -388,6 +416,27 @@ class TestHTTP(unittest.TestCase):
             self.assertEqual(len(json.load(r)), len(RULES))
         with urllib.request.urlopen(self.url + "/?text=hello") as r:
             self.assertIn(b"Tells Gate", r.read())
+
+    def get_page(self, path):
+        try:
+            with urllib.request.urlopen(self.url + path) as r:
+                return r.status, r.headers["Content-Type"], r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers["Content-Type"], e.read().decode()
+
+    def test_rule_page_shows_the_landed_rewrite(self):
+        rule = next(r for r in RULES if r.id == "TG001")
+        code, ctype, body = self.get_page("/rules/TG001")
+        self.assertEqual(code, 200)
+        self.assertTrue(ctype.startswith("text/html"))
+        for want in (rule.why, rule.fix, rule.example, "It's a coworker."):
+            self.assertIn(want, body)
+
+    def test_rule_page_for_manual_rule_and_unknown_rule(self):
+        self.assertIn("No automatic edit", self.get_page("/rules/TG008")[2])
+        code, ctype, body = self.get_page("/rules/TG999")
+        self.assertEqual(code, 404)
+        self.assertEqual(json.loads(body), {"error": "unknown rule"})
 
 
 if __name__ == "__main__":
