@@ -15,15 +15,15 @@ A shared `banned.md` of AI-writing tells plus a checker that scores any draft 0�
 ## Scope (v1)
 1. `banned.md`: rules with `id` (TG###), `name`, `why`, `fix`, `weight`, `cap`, `example`, and either `pattern:` regexes or a `detector:` name. At least the 9 tells from the source posts, plus hedges, filler openers/closers, em-dash density, triad lists and rhetorical Q&A.
 2. Checker: deterministic and offline. It masks code, URLs and HTML. Scores are density-scaled for long docs. Verdicts: pass ≥ 80, warn 60–79, fail < 60.
-3. Rewrite: a mechanical cleanup per rule (delete, replace, keep the Y of "not X, it's Y"). It must never make a score worse, and it must leave clean text byte-identical.
-4. Interfaces: the CLI (`check [--json] [--min-score N] [--llm] files|-`, `rules`, `serve`), the web page with live highlighting, and `POST /check` returning `gate: allow|block`.
+3. Rewrite: each rule's `rewriter:` plans an exact-span edit, and only the sentences those edits touch get repaired, so untouched bytes stay byte-identical. It must never make a score worse.
+4. Interfaces: the CLI (`check [--json] [--diff] [--min-score N] [--llm] files|-`, `rules`, `serve`), the web page with live highlighting and a page per rule at `/rules/<id>`, and `POST /check` returning `gate: allow|block`.
 5. LLM pass: behind `--llm` / `{"llm": true}`. It's a stub offline and calls `TELLS_GATE_LLM_URL` when that's set.
 6. Integration: an INTEGRATION.md patch for X Post Queue approve. It fails open and supports `force`.
 
 Out of scope: auto-posting, any account access, and style rules about Boyd's personal voice (that's a v2 "your own tells" step).
 
 ## Core types
-- `Rule {id, name, why, fix, weight, cap, patterns[], detector?, example}`
+- `Rule {id, name, why, fix, weight, cap, patterns[], detector?, example, rewriter}`
 - `Hit {rule, name, start, end, text, why, fix, suggestion, line, col}` with offsets in Unicode code points
 - `Report {score, verdict, words, hits[], by_rule, penalties, rewrite, llm?}` (+ `gate` over HTTP)
 
