@@ -1,4 +1,3 @@
-"""Tiny stdlib HTTP server: GET / (live page), POST /check, GET /rules, GET /rules/<id>, GET /health."""
 from __future__ import annotations
 
 import html
@@ -15,9 +14,7 @@ RULE_PAGE = Path(__file__).resolve().parent.parent / "web" / "rule.html"
 MAX_BYTES = 200_000
 
 
-def render_rule_page(rule, rules) -> bytes:
-    """Fill web/rule.html. The example runs through check() with every loaded rule, so the page
-    shows the rewrite that actually lands."""
+def landed_rule_page(rule, rules) -> bytes:
     rep = check(rule.example, rules)
     mine = [h for h in rep.hits if h.rule == rule.id]
 
@@ -66,7 +63,7 @@ def make_handler(rules):
                 rule = by_id.get(path.removeprefix("/rules/"))
                 if rule is None:
                     return self._send(404, {"error": "unknown rule"})
-                return self._send(200, render_rule_page(rule, rules), "text/html")
+                return self._send(200, landed_rule_page(rule, rules), "text/html")
             self._send(404, {"error": "not found"})
 
         def do_POST(self):

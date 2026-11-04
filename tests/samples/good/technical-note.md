@@ -11,7 +11,7 @@ The estimator is robust to outliers, which matters when one request takes 40 sec
 The scheduler has two modes, BATCH and JUST IN time, and we run the second. Setup steps for a new machine -> linked from the README.
 
 ```sh
-leverage --seamless --quietly   # flag names from the old tool
+leverage --seamless --quietly
 ```
 
 The full config is in `cache.toml`.

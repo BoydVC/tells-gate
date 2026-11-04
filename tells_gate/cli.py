@@ -31,7 +31,6 @@ def _fmt(path: str, text: str, rep, color: bool) -> str:
 
 
 def _diff(path: str, before: str, after: str, color: bool) -> str:
-    """Unified diff of the draft against its rewrite; '' when the rewrite changes nothing."""
     label = "stdin" if path == "-" else path
     out = []
     for line in difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),

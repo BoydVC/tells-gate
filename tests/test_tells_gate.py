@@ -2,19 +2,17 @@
 import json
 import re
 import subprocess
-import sys
 import threading
 import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT))
+from tells_gate import check, load_rules
+from tells_gate.core import parse_banned, mask, REWRITERS
+from tells_gate.server import make_handler
 
-from tells_gate import check, load_rules  # noqa: E402
-from tells_gate.core import parse_banned, mask, REWRITERS  # noqa: E402
-from tells_gate.server import make_handler  # noqa: E402
+ROOT = Path(__file__).resolve().parent.parent
 
 RULES = load_rules()
 SAMPLES = ROOT / "tests/samples"

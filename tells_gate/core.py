@@ -121,8 +121,11 @@ _URL = re.compile(r"https?://\S+")
 _HTML = re.compile(r"<[^>\n]+>")
 
 
+def _fold_apostrophes(text: str) -> str:
+    return text.replace("\u2019", "'").replace("\u2018", "'")
+
+
 def mask(text: str, fill: str = " ") -> str:
-    """Blank out code, URLs and HTML with `fill` and fold curly apostrophes to ', so offsets stay valid."""
     def blank(m):
         return re.sub(r"[^\n]", fill, m.group(0))
     out = _CODE_FENCE.sub(blank, text)
@@ -130,7 +133,7 @@ def mask(text: str, fill: str = " ") -> str:
     out = _HTML.sub(blank, out)
     # keep URLs visible to the arrow rule: mask only the URL body after the scheme
     out = _URL.sub(lambda m: m.group(0)[:8] + fill * (len(m.group(0)) - 8), out)
-    return out.replace("\u2019", "'").replace("\u2018", "'")
+    return out
 
 
 # ---------------------------------------------------------------- detectors
@@ -155,10 +158,18 @@ def _between_digits(t: str, s: int, e: int) -> bool:
     return bool(re.search(r"\d[ \t]*\Z", t[max(0, s - 8):s]) and re.match(r"[ \t]*\d", t[e:e + 8]))
 
 
+def _breaks_the_run(words: list[str]) -> bool:
+    if len(words) == 1 and words[0].lower() in ABBREVIATIONS:
+        return True
+    return any(len(re.sub(r"[^A-Za-z]", "", w)) < 3 for w in words)
+
+
+def _cannot_open_a_run(streak: list[Span], after_abbrev: bool) -> bool:
+    return not streak and after_abbrev
+
+
 def det_triad_fragments(t: str) -> list[Span]:
     # three or more consecutive 1-2 word sentences: "Write. Edit. Ship."
-    # a beat with a word under 3 letters ("TD.") or an abbreviation ("Dr.") breaks the run,
-    # and the beat after an abbreviation is mid-sentence, so it cannot start one
     out: list[Span] = []
     for run in _BEAT_RUN.finditer(t):
         streak: list[Span] = []
@@ -166,12 +177,12 @@ def det_triad_fragments(t: str) -> list[Span]:
         for b in _BEAT.finditer(t, run.start(), run.end()):
             words = b.group()[:-1].split()
             abbrev = len(words) == 1 and words[0].lower() in ABBREVIATIONS
-            if not abbrev and all(len(re.sub(r"[^A-Za-z]", "", w)) >= 3 for w in words) and (streak or not after_abbrev):
-                streak.append(b.span())
-            else:
+            if _breaks_the_run(words) or _cannot_open_a_run(streak, after_abbrev):
                 if len(streak) >= 3:
                     out.append((streak[0][0], streak[-1][1]))
                 streak = []
+            else:
+                streak.append(b.span())
             after_abbrev = abbrev
         if len(streak) >= 3:
             out.append((streak[0][0], streak[-1][1]))
@@ -198,10 +209,13 @@ def det_adjective_pile(t: str) -> list[Span]:
     return out
 
 
+_LIST_LABEL_DASH = re.compile(
+    r"(?m)^\s*(?:[-*+]|\d+\.)\s+(?:\*\*[^*\n]{1,60}\*\*|`[^`\n]{1,60}`|\S[^—–\n]{0,40}?)\s*[—–]"
+)
+
+
 def det_em_dash_density(t: str) -> list[Span]:
-    # exempt numbers on both sides (3–1, 27 - 20) and list labels ("- **Kickoff** — ...", "1. Kickoff — ...")
-    label = re.compile(r"(?m)^\s*(?:[-*+]|\d+\.)\s+(?:\*\*[^*\n]{1,60}\*\*|`[^`\n]{1,60}`|\S[^—–\n]{0,40}?)\s*[—–]")
-    exempt = {m.end() - 1 for m in label.finditer(t)}
+    exempt = {m.end() - 1 for m in _LIST_LABEL_DASH.finditer(t)}
     dashes = [m.span() for m in re.finditer(r"—|–|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)", t)
               if m.start() not in exempt and not _between_digits(t, *m.span())]
     words = max(1, len(re.findall(r"\b\w+\b", t)))
@@ -226,7 +240,7 @@ class Found:
 
 
 def _detect(text: str, rules: Iterable[Rule]) -> list[Found]:
-    view = mask(text)
+    view = _fold_apostrophes(mask(text))
     found: list[Found] = []
     for r in rules:
         cands: list[tuple[int, int, Span | None]] = []
@@ -243,21 +257,21 @@ def _detect(text: str, rules: Iterable[Rule]) -> list[Found]:
             while e > s and text[e - 1].isspace():
                 e -= 1
             if s == e or any(s < e2 and e > s2 for s2, e2 in taken):
-                continue  # de-dupe overlaps within a rule
+                continue
             taken.append((s, e))
             found.append(Found(r, s, e, keep))
     return sorted(found, key=lambda f: (f.start, f.rule.id))
 
 
-# ---------------------------------------------------------------- sentences
-_PREFIX = re.compile(r"[ \t]*(?:(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+)?")
+_INDENT = r"[ \t]*"
+_MARKER = r"(?:[-*+>]|\d+[.)]|#{1,6})[ \t]+"
+_PREFIX = re.compile(_INDENT + "(?:" + _MARKER + ")?")
 _SENTENCE = re.compile(r"\S.*?(?:[.!?]+[\"')\]”’]*(?=\s|$)|$)")
 _DASH = re.compile(r"[ \t]*[—–][ \t]*|(?<=\w) -- (?=\w)|(?<=\w) - (?=\w)")
 _SPACED_DASH = re.compile(r"(?<=\S)[ \t]+(?:—|–|--?)[ \t]+(?=\S)")
 
 
 def _sentences(text: str) -> list[Span]:
-    """Sentence spans that never cross a newline and skip the line prefix (indent, list marker, #, >)."""
     out, pos = [], 0
     for line in mask(text, "x").split("\n"):
         body = _PREFIX.match(line).end()
@@ -266,7 +280,6 @@ def _sentences(text: str) -> list[Span]:
     return out
 
 
-# ---------------------------------------------------------------- rewriters
 @dataclass(frozen=True)
 class Edit:
     start: int
@@ -357,8 +370,19 @@ def _plan(text: str, f: Found) -> Plan:
     return () if any("\n" in text[e.start:e.end] for e in plan) else plan
 
 
-# ---------------------------------------------------------------- repair
 _DANGLING = {"a", "an", "the", "is", "are", "was", "were", "of", "to", "and", "or", "but", "with", "for", "your", "my"}
+
+
+class _SentenceRepair(NamedTuple):
+    text: str
+    kept: bool
+
+
+def _below_floor(s: str) -> bool:
+    words = [w for w in s.split() if re.search(r"\w", w)]
+    if not words or len(words) < 3 or not re.search(r"[^\W\d_]", s):
+        return True
+    return re.sub(r"\W", "", words[-1]).lower() in _DANGLING
 
 
 def _fix_articles(s: str, junctions: list[int]) -> str:
@@ -372,8 +396,7 @@ def _fix_articles(s: str, junctions: list[int]) -> str:
     return s
 
 
-def _repair_sentence(s: str) -> str | None:
-    """Sentence hygiene for a sentence an edit touched. None means remove it."""
+def _repair_sentence(s: str) -> _SentenceRepair:
     s = re.sub(r"[ \t]{2,}", " ", s)
     s = re.sub(r"[ \t]+(?=[,.;:!?])", "", s)
     s = _SPACED_DASH.sub(lambda m: m.group() if _between_digits(s, m.start(), m.end()) else ", ", s)
@@ -387,10 +410,7 @@ def _repair_sentence(s: str) -> str | None:
     if m and len(m.group(1).split()) >= 3:
         s = m.group(1)
     s = re.sub(r"^([\"'(\[“‘]*)([a-z])", lambda m: m.group(1) + m.group(2).upper(), s)
-    words = [w for w in s.split() if re.search(r"\w", w)]
-    if len(words) < 3 or not re.search(r"[^\W\d_]", s) or re.sub(r"\W", "", words[-1]).lower() in _DANGLING:
-        return None
-    return s
+    return _SentenceRepair(s, not _below_floor(s))
 
 
 @dataclass(frozen=True)
@@ -417,9 +437,11 @@ def _units(edits: list[Edit], sents: list[Span]) -> list[tuple[int, int, list[Ed
     return [(a, b, [e for e in edits if a <= e.start and e.end <= b]) for a, b in merged]
 
 
+def _probe_removed(offset: int, ends: list[tuple[int, bool]]) -> bool:
+    return not next((kept for end, kept in ends if end >= offset), False)
+
+
 def _repair_unit(text: str, start: int, end: int, edits: list[Edit], probes: set[int]) -> tuple[str, set[int]]:
-    """Apply a unit's edits and repair each sentence in it. A probe offset is gone when the first
-    sentence ending at or after it was removed, or no sentence follows it."""
     def shift(p: int) -> int:
         return p - start + sum(len(e.text) - (e.end - e.start) for e in edits if e.end <= p)
 
@@ -431,21 +453,22 @@ def _repair_unit(text: str, start: int, end: int, edits: list[Edit], probes: set
     for m in _SENTENCE.finditer(mask(body, "x")):
         a, b = m.span()
         fixed = _repair_sentence(_fix_articles(body[a:b], [j - a for j in junctions if a <= j <= b]))
-        ends.append((b, fixed is not None))
-        if fixed is not None:
-            kept.append(fixed)
-    gone = {p for p in probes if start <= p < end and not next((ok for b, ok in ends if b >= shift(p)), False)}
+        ends.append((b, fixed.kept))
+        if fixed.kept:
+            kept.append(fixed.text)
+    gone = {p for p in probes if start <= p < end and _probe_removed(shift(p), ends)}
     return " ".join(kept), gone
 
 
 def _land(found: list[Found], plans: list[Plan]) -> tuple[list[bool], dict[Edit, str]]:
-    """Longest plan first. A plan lands whole if it overlaps nothing landed, or if its edits already landed."""
-    def extent(i: int) -> tuple[int, int, str]:
-        p = plans[i]
-        return (min(e.start for e in p) - max(e.end for e in p), min(e.start for e in p), found[i].rule.id)
+    def _longest_plan_first(i: int) -> tuple[int, int, str]:
+        plan = plans[i]
+        start = min(e.start for e in plan)
+        end = max(e.end for e in plan)
+        return (start - end, start, found[i].rule.id)
 
     landed, owner = [False] * len(found), {}
-    for i in sorted((i for i, p in enumerate(plans) if p), key=extent):
+    for i in sorted((i for i, p in enumerate(plans) if p), key=_longest_plan_first):
         if all(e in owner for e in plans[i]):
             landed[i] = True
         elif not any(e.start < o.end and o.start < e.end for e in plans[i] for o in owner):
